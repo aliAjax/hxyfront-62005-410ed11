@@ -1,0 +1,424 @@
+import { useState, useEffect } from 'react';
+import type { MaintenanceTask, PipeRecord } from '../types/maintenance';
+import { maintenanceService } from '../services/maintenanceService';
+import { stopService } from '../services/stopService';
+import type { Stop } from '../types/stops';
+import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from '../types/stops';
+
+interface TuningRecordViewProps {
+  taskId: string;
+  onBack: () => void;
+}
+
+interface PipeFormData {
+  stopId: string;
+  pitch: string;
+  centDeviation: string;
+  temperature: string;
+  humidity: string;
+  reedStatus: string;
+  remarks: string;
+}
+
+const DEFAULT_PIPE_FORM_DATA: PipeFormData = {
+  stopId: '',
+  pitch: '',
+  centDeviation: '',
+  temperature: '',
+  humidity: '',
+  reedStatus: '',
+  remarks: '',
+};
+
+export function TuningRecordView({ taskId, onBack }: TuningRecordViewProps) {
+  const [task, setTask] = useState<MaintenanceTask | null>(null);
+  const [stops, setStops] = useState<Stop[]>([]);
+  const [editingPipe, setEditingPipe] = useState<PipeRecord | null>(null);
+  const [formData, setFormData] = useState<PipeFormData>(DEFAULT_PIPE_FORM_DATA);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+
+  useEffect(() => {
+    loadTask();
+    setStops(stopService.getAll());
+  }, [taskId]);
+
+  const loadTask = () => {
+    const loadedTask = maintenanceService.getById(taskId);
+    if (loadedTask) {
+      setTask(loadedTask);
+    }
+  };
+
+  const handleEditPipe = (pipe: PipeRecord) => {
+    setEditingPipe(pipe);
+    setFormData({
+      stopId: pipe.stopId || '',
+      pitch: pipe.pitch || '',
+      centDeviation: pipe.centDeviation?.toString() || '',
+      temperature: pipe.temperature?.toString() || '',
+      humidity: pipe.humidity?.toString() || '',
+      reedStatus: pipe.reedStatus || '',
+      remarks: pipe.remarks || '',
+    });
+  };
+
+  const handleCloseForm = () => {
+    setEditingPipe(null);
+    setFormData(DEFAULT_PIPE_FORM_DATA);
+  };
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSavePipe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPipe) return;
+
+    const selectedStop = stops.find((s) => s.id === formData.stopId);
+
+    maintenanceService.updatePipeRecord(taskId, editingPipe.id, {
+      stopId: formData.stopId || undefined,
+      stopName: selectedStop ? stopService.getDisplayLabel(selectedStop) : undefined,
+      pitch: formData.pitch || undefined,
+      centDeviation: formData.centDeviation ? Number(formData.centDeviation) : undefined,
+      temperature: formData.temperature ? Number(formData.temperature) : undefined,
+      humidity: formData.humidity ? Number(formData.humidity) : undefined,
+      reedStatus: formData.reedStatus || undefined,
+      remarks: formData.remarks || undefined,
+    });
+
+    loadTask();
+    handleCloseForm();
+  };
+
+  const isPipeCompleted = (pipe: PipeRecord): boolean => {
+    return !!(pipe.pitch || pipe.centDeviation !== undefined || pipe.remarks);
+  };
+
+  const getFilteredPipes = () => {
+    if (!task) return [];
+    switch (filter) {
+      case 'pending':
+        return task.pipeRecords.filter((p) => !isPipeCompleted(p));
+      case 'completed':
+        return task.pipeRecords.filter((p) => isPipeCompleted(p));
+      default:
+        return task.pipeRecords;
+    }
+  };
+
+  const getCompletedCount = () => {
+    if (!task) return 0;
+    return task.pipeRecords.filter((p) => isPipeCompleted(p)).length;
+  };
+
+  const getDeviationCount = () => {
+    if (!task) return 0;
+    return task.pipeRecords.filter((p) => p.centDeviation !== undefined && Math.abs(p.centDeviation) > 5).length;
+  };
+
+  if (!task) {
+    return (
+      <main className="app">
+        <div className="empty-state">
+          <p>任务不存在</p>
+          <button className="primary" onClick={onBack}>返回</button>
+        </div>
+      </main>
+    );
+  }
+
+  const filteredPipes = getFilteredPipes();
+  const completedCount = getCompletedCount();
+  const totalCount = task.pipeRecords.length;
+  const deviationCount = getDeviationCount();
+
+  return (
+    <main className="app">
+      <section className="hero venue-hero">
+        <button className="back-btn" onClick={onBack}>
+          ← 返回工作台
+        </button>
+        <p>调音记录 · {task.maintenanceDate}</p>
+        <h1>{task.venueName}</h1>
+        <span>
+          参与人员：{task.participants} · 共 {task.pipeNumbers.length} 支音管待调音
+        </span>
+      </section>
+
+      <section className="metrics">
+        <article>
+          <small>已完成</small>
+          <strong style={{ color: completedCount === totalCount ? '#059669' : undefined }}>
+            {completedCount}/{totalCount}
+          </strong>
+        </article>
+        <article style={{ borderTopColor: '#dc2626' }}>
+          <small>偏差超限</small>
+          <strong style={{ color: '#dc2626' }}>{deviationCount}</strong>
+        </article>
+        <article style={{ borderTopColor: '#0ea5e9' }}>
+          <small>当前温度</small>
+          <strong style={{ color: '#0ea5e9' }}>-°C</strong>
+        </article>
+        <article style={{ borderTopColor: '#475569' }}>
+          <small>当前湿度</small>
+          <strong style={{ color: '#475569' }}>-%</strong>
+        </article>
+      </section>
+
+      <section className="panel">
+        <div className="heading">
+          <div>
+            <p>音管调音记录</p>
+            <h2>音管列表</h2>
+          </div>
+          <div className="category-tabs" style={{ margin: 0, padding: 0, border: 'none' }}>
+            {(['all', 'pending', 'completed'] as const).map((f) => (
+              <button
+                key={f}
+                className={`category-tab ${filter === f ? 'active' : ''}`}
+                style={
+                  filter === f
+                    ? {
+                        background: 'var(--primary)',
+                        color: '#fff',
+                        borderColor: 'var(--primary)',
+                      }
+                    : undefined
+                }
+                onClick={() => setFilter(f)}
+              >
+                {f === 'all' ? '全部' : f === 'pending' ? '待调音' : '已完成'}
+                <span className="tab-count">
+                  {f === 'all' ? totalCount : f === 'pending' ? totalCount - completedCount : completedCount}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {filteredPipes.length === 0 ? (
+          <div className="empty-state">
+            <p>{filter === 'pending' ? '所有音管已完成调音' : filter === 'completed' ? '暂无已完成的音管' : '暂无音管记录'}</p>
+          </div>
+        ) : (
+          <div className="pipe-record-list">
+            {filteredPipes.map((pipe) => {
+              const completed = isPipeCompleted(pipe);
+              const selectedStop = pipe.stopId ? stops.find((s) => s.id === pipe.stopId) : null;
+
+              return (
+                <div
+                  key={pipe.id}
+                  className={`pipe-record-card ${completed ? 'completed' : 'pending'} ${editingPipe?.id === pipe.id ? 'editing' : ''}`}
+                  onClick={() => !editingPipe && handleEditPipe(pipe)}
+                >
+                  <div className="pipe-record-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className={`pipe-status-indicator ${completed ? 'done' : 'todo'}`}>
+                        {completed ? '✓' : ''}
+                      </div>
+                      <div>
+                        <h3 className="pipe-number-large">{pipe.pipeNumber}</h3>
+                        {selectedStop && (
+                          <span
+                            className="stop-category"
+                            style={{
+                              background: `color-mix(in srgb, ${STOP_CATEGORY_COLORS[selectedStop.category]} 15%, #ffffff)`,
+                              color: STOP_CATEGORY_COLORS[selectedStop.category],
+                              margin: 0,
+                            }}
+                          >
+                            {STOP_CATEGORY_LABELS[selectedStop.category]} · {stopService.getDisplayLabel(selectedStop)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="pipe-record-status">
+                      {completed ? '已完成' : '待调音'}
+                    </span>
+                  </div>
+
+                  {completed ? (
+                    <div className="pipe-record-details">
+                      {pipe.pitch && (
+                        <div className="detail-item">
+                          <span className="detail-label">音高</span>
+                          <span className="detail-value">{pipe.pitch}</span>
+                        </div>
+                      )}
+                      {pipe.centDeviation !== undefined && (
+                        <div className="detail-item">
+                          <span className="detail-label">音分偏差</span>
+                          <span
+                            className="detail-value"
+                            style={{
+                              color: Math.abs(pipe.centDeviation) > 5 ? '#dc2626' : '#059669',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {pipe.centDeviation > 0 ? '+' : ''}{pipe.centDeviation} cent
+                          </span>
+                        </div>
+                      )}
+                      {pipe.temperature !== undefined && (
+                        <div className="detail-item">
+                          <span className="detail-label">温度</span>
+                          <span className="detail-value">{pipe.temperature}°C</span>
+                        </div>
+                      )}
+                      {pipe.humidity !== undefined && (
+                        <div className="detail-item">
+                          <span className="detail-label">湿度</span>
+                          <span className="detail-value">{pipe.humidity}%</span>
+                        </div>
+                      )}
+                      {pipe.reedStatus && (
+                        <div className="detail-item">
+                          <span className="detail-label">簧片状态</span>
+                          <span className="detail-value">{pipe.reedStatus}</span>
+                        </div>
+                      )}
+                      {pipe.remarks && (
+                        <div className="detail-item full-width">
+                          <span className="detail-label">备注</span>
+                          <span className="detail-value">{pipe.remarks}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="pipe-record-empty">
+                      <p>📝 点击开始记录调音数据</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {editingPipe && (
+        <div className="modal-overlay" onClick={handleCloseForm}>
+          <div className="modal tuning-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>记录调音数据</h2>
+                <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>
+                  音管编号：<strong style={{ color: 'var(--primary)' }}>{editingPipe.pipeNumber}</strong>
+                </p>
+              </div>
+              <button className="close-btn" onClick={handleCloseForm}>
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePipe} className="modal-body">
+              <div className="field-grid">
+                <label className="full-width">
+                  <span>音栓</span>
+                  <select name="stopId" value={formData.stopId} onChange={handleFormChange}>
+                    <option value="">-- 请选择音栓（可选）--</option>
+                    {stops.map((stop) => (
+                      <option key={stop.id} value={stop.id}>
+                        [{STOP_CATEGORY_LABELS[stop.category]}] {stopService.getDisplayLabel(stop)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>音高</span>
+                  <input
+                    type="text"
+                    name="pitch"
+                    placeholder="如：C4 / A4"
+                    value={formData.pitch}
+                    onChange={handleFormChange}
+                  />
+                </label>
+
+                <label>
+                  <span>音分偏差</span>
+                  <input
+                    type="number"
+                    name="centDeviation"
+                    placeholder="-10 ~ +10"
+                    value={formData.centDeviation}
+                    onChange={handleFormChange}
+                    step="0.1"
+                  />
+                </label>
+
+                <label>
+                  <span>温度 (°C)</span>
+                  <input
+                    type="number"
+                    name="temperature"
+                    placeholder="如：22"
+                    value={formData.temperature}
+                    onChange={handleFormChange}
+                    min="0"
+                    max="50"
+                    step="0.5"
+                  />
+                </label>
+
+                <label>
+                  <span>湿度 (%)</span>
+                  <input
+                    type="number"
+                    name="humidity"
+                    placeholder="如：45"
+                    value={formData.humidity}
+                    onChange={handleFormChange}
+                    min="0"
+                    max="100"
+                    step="1"
+                  />
+                </label>
+
+                <label className="full-width">
+                  <span>簧片状态</span>
+                  <select name="reedStatus" value={formData.reedStatus} onChange={handleFormChange}>
+                    <option value="">-- 请选择（簧片音栓必填）--</option>
+                    <option value="正常">正常</option>
+                    <option value="需微调">需微调</option>
+                    <option value="需更换">需更换</option>
+                    <option value="已调整">已调整</option>
+                  </select>
+                </label>
+
+                <label className="full-width">
+                  <span>维修备注</span>
+                  <textarea
+                    name="remarks"
+                    placeholder="记录调音过程中的发现和处理措施"
+                    value={formData.remarks}
+                    onChange={handleFormChange}
+                    rows={3}
+                  />
+                </label>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" onClick={handleCloseForm}>
+                  取消
+                </button>
+                <button type="submit" className="primary">
+                  保存记录
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}

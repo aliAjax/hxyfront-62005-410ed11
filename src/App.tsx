@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import "./styles.css";
 import { VenueManagement } from './components/VenueManagement';
 import { StopManagement } from './components/StopManagement';
+import { MaintenanceTaskCreate } from './components/MaintenanceTaskCreate';
+import { TuningRecordView } from './components/TuningRecordView';
 import { venueService } from './services/venueService';
 import { stopService } from './services/stopService';
 import type { Venue } from './types/venue';
 import type { StopCategory } from './types/stops';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from './types/stops';
 
-type Page = 'workspace' | 'venues' | 'stops';
+type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record';
 
 const project = {
   "sourceNo": 7,
@@ -75,6 +77,7 @@ const CATEGORY_FILTER_MAP: Record<string, StopCategory> = {
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('workspace');
+  const [currentTaskId, setCurrentTaskId] = useState<string>('');
   const [venues, setVenues] = useState<{ id: string; name: string }[]>([]);
   const [stops, setStops] = useState<{ id: string; label: string; category: StopCategory }[]>([]);
   const [selectedVenueId, setSelectedVenueId] = useState<string>('');
@@ -155,6 +158,27 @@ function App() {
     return <StopManagement onBack={() => setCurrentPage('workspace')} />;
   }
 
+  if (currentPage === 'create-task') {
+    return (
+      <MaintenanceTaskCreate
+        onBack={() => setCurrentPage('workspace')}
+        onTaskCreated={(taskId) => {
+          setCurrentTaskId(taskId);
+          setCurrentPage('tuning-record');
+        }}
+      />
+    );
+  }
+
+  if (currentPage === 'tuning-record' && currentTaskId) {
+    return (
+      <TuningRecordView
+        taskId={currentTaskId}
+        onBack={() => setCurrentPage('workspace')}
+      />
+    );
+  }
+
   return (
     <main className="app">
       <section className="hero">
@@ -207,7 +231,10 @@ function App() {
 
           <h2 style={{ marginTop: '24px' }}>快速入口</h2>
           <div className="quick-actions">
-            <button className="primary full-width" onClick={() => setCurrentPage('venues')}>
+            <button className="primary full-width" style={{ background: 'var(--accent)', borderColor: 'var(--accent)' }} onClick={() => setCurrentPage('create-task')}>
+              📋 创建维护任务
+            </button>
+            <button className="primary full-width" style={{ marginTop: '10px' }} onClick={() => setCurrentPage('venues')}>
               🏛️ 场馆档案管理
             </button>
             <button className="primary full-width" style={{ marginTop: '10px', background: STOP_CATEGORY_COLORS.principal, borderColor: STOP_CATEGORY_COLORS.principal }} onClick={() => setCurrentPage('stops')}>
