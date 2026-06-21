@@ -171,7 +171,10 @@ export function StopManagement({ onBack }: StopManagementProps) {
         {filteredStops.length === 0 ? (
           <div className="empty-state">
             <p>{searchKeyword ? '未找到匹配的音栓' : '暂无音栓资料'}</p>
-            <button className="primary" onClick={handleAdd}>
+            <button
+              className="primary"
+              onClick={searchKeyword ? () => setSearchKeyword('') : handleAdd}
+            >
               {searchKeyword ? '清除搜索' : '添加第一个音栓'}
             </button>
           </div>
