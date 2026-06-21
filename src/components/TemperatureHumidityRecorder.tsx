@@ -5,6 +5,7 @@ import { maintenanceService } from '../services/maintenanceService';
 interface TemperatureHumidityRecorderProps {
   taskId: string;
   onRecordAdded?: () => void;
+  recordsOverride?: TemperatureHumidityRecord[];
   onAddRecord?: (data: { temperature: number; humidity: number; note?: string }) => TemperatureHumidityRecord | undefined;
   onDeleteRecord?: (recordId: string) => boolean;
 }
@@ -21,15 +22,23 @@ const DEFAULT_FORM_DATA: FormData = {
   note: '',
 };
 
-export function TemperatureHumidityRecorder({ taskId, onRecordAdded, onAddRecord, onDeleteRecord }: TemperatureHumidityRecorderProps) {
+export function TemperatureHumidityRecorder({
+  taskId,
+  onRecordAdded,
+  recordsOverride,
+  onAddRecord,
+  onDeleteRecord,
+}: TemperatureHumidityRecorderProps) {
   const [records, setRecords] = useState<TemperatureHumidityRecord[]>([]);
   const [formData, setFormData] = useState<FormData>(DEFAULT_FORM_DATA);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isAdding, setIsAdding] = useState(false);
+  const displayRecords = recordsOverride ?? records;
 
   useEffect(() => {
+    if (recordsOverride) return;
     loadRecords();
-  }, [taskId]);
+  }, [taskId, recordsOverride]);
 
   const loadRecords = () => {
     const task = maintenanceService.getById(taskId);
@@ -39,13 +48,13 @@ export function TemperatureHumidityRecorder({ taskId, onRecordAdded, onAddRecord
   };
 
   const sortedRecords = useMemo(() => {
-    return [...records].sort(
+    return [...displayRecords].sort(
       (a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()
     );
-  }, [records]);
+  }, [displayRecords]);
 
   const stats = useMemo(() => {
-    if (records.length === 0) {
+    if (displayRecords.length === 0) {
       return {
         maxTemp: undefined,
         minTemp: undefined,
@@ -54,8 +63,8 @@ export function TemperatureHumidityRecorder({ taskId, onRecordAdded, onAddRecord
         latest: undefined,
       };
     }
-    const temperatures = records.map((r) => r.temperature);
-    const humidities = records.map((r) => r.humidity);
+    const temperatures = displayRecords.map((r) => r.temperature);
+    const humidities = displayRecords.map((r) => r.humidity);
     return {
       maxTemp: Math.max(...temperatures),
       minTemp: Math.min(...temperatures),
@@ -63,7 +72,7 @@ export function TemperatureHumidityRecorder({ taskId, onRecordAdded, onAddRecord
       minHumidity: Math.min(...humidities),
       latest: sortedRecords[0],
     };
-  }, [records, sortedRecords]);
+  }, [displayRecords, sortedRecords]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -112,12 +121,12 @@ export function TemperatureHumidityRecorder({ taskId, onRecordAdded, onAddRecord
       onAddRecord(recordData);
     } else {
       maintenanceService.addTemperatureHumidityRecord(taskId, recordData);
+      loadRecords();
+      onRecordAdded?.();
     }
 
-    loadRecords();
     setFormData(DEFAULT_FORM_DATA);
     setIsAdding(false);
-    onRecordAdded?.();
   };
 
   const handleDeleteRecord = (recordId: string) => {
@@ -127,9 +136,9 @@ export function TemperatureHumidityRecorder({ taskId, onRecordAdded, onAddRecord
       onDeleteRecord(recordId);
     } else {
       maintenanceService.deleteTemperatureHumidityRecord(taskId, recordId);
+      loadRecords();
+      onRecordAdded?.();
     }
-    loadRecords();
-    onRecordAdded?.();
   };
 
   const formatDateTime = (isoString: string): string => {
@@ -164,7 +173,7 @@ export function TemperatureHumidityRecorder({ taskId, onRecordAdded, onAddRecord
         </button>
       </div>
 
-      {records.length > 0 && (
+      {displayRecords.length > 0 && (
         <div className="th-stats-grid">
           <div className="th-stat-card temp-stat">
             <div className="th-stat-icon">🌡️</div>
@@ -258,7 +267,7 @@ export function TemperatureHumidityRecorder({ taskId, onRecordAdded, onAddRecord
         </form>
       )}
 
-      {records.length === 0 ? (
+      {displayRecords.length === 0 ? (
         <div className="empty-state" style={{ padding: '40px 20px' }}>
           <p>暂无温湿度记录</p>
           <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>

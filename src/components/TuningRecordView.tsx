@@ -44,8 +44,11 @@ export function TuningRecordView({ taskId, onBack, onViewReport, restoreFromDraf
   const [lastSaved, setLastSaved] = useState<string>('');
   const [isDraftMode, setIsDraftMode] = useState(false);
   const saveTimeoutRef = useRef<number | null>(null);
+  const restoredDraftRef = useRef(false);
+  const skipNextDraftSaveRef = useRef(false);
 
   useEffect(() => {
+    restoredDraftRef.current = false;
     loadTask();
     setStops(stopService.getAll());
   }, [taskId]);
@@ -58,18 +61,24 @@ export function TuningRecordView({ taskId, onBack, onViewReport, restoreFromDraf
   };
 
   useEffect(() => {
-    if (restoreFromDraft) {
+    if (!task) return;
+    if (restoreFromDraft && !restoredDraftRef.current) {
       restoreDraft();
-    } else if (task) {
+      restoredDraftRef.current = true;
+    } else if (!restoreFromDraft) {
       const draft = draftService.getTuningRecordDraft(taskId);
       if (draft) {
         setShowDraftRestore(true);
       }
     }
-  }, [taskId, task, restoreFromDraft]);
+  }, [taskId, task?.id, restoreFromDraft]);
 
   useEffect(() => {
     if (!task) return;
+    if (skipNextDraftSaveRef.current) {
+      skipNextDraftSaveRef.current = false;
+      return;
+    }
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -178,6 +187,7 @@ export function TuningRecordView({ taskId, onBack, onViewReport, restoreFromDraf
     if (!window.confirm(`确定要将 ${getDraftChangedCount()} 项草稿修改正式保存到历史记录中吗？`)) {
       return;
     }
+    skipNextDraftSaveRef.current = true;
     maintenanceService.update(taskId, {
       pipeRecords: task.pipeRecords,
       temperatureHumidityRecords: task.temperatureHumidityRecords,
@@ -562,6 +572,7 @@ export function TuningRecordView({ taskId, onBack, onViewReport, restoreFromDraf
       <TemperatureHumidityRecorder
         taskId={taskId}
         onRecordAdded={handleTHRecordAdded}
+        recordsOverride={isDraftMode ? task.temperatureHumidityRecords : undefined}
         onAddRecord={isDraftMode ? handleAddTHRecordInDraft : undefined}
         onDeleteRecord={isDraftMode ? handleDeleteTHRecordInDraft : undefined}
       />
