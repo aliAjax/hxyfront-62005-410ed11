@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { MaintenanceTask, PipeRecord, TemperatureHumidityRecord } from '../types/maintenance';
+import type { MaintenanceTask, PipeRecord } from '../types/maintenance';
 import { maintenanceService } from '../services/maintenanceService';
 import { stopService } from '../services/stopService';
 import type { Stop } from '../types/stops';
@@ -49,11 +49,6 @@ export function MaintenanceReport({ taskId, onBack }: MaintenanceReportProps) {
     return task.pipeRecords.filter((p) => p.centDeviation !== undefined && Math.abs(p.centDeviation) > 5);
   }, [task]);
 
-  const completedPipes = useMemo(() => {
-    if (!task) return [];
-    return task.pipeRecords.filter((p) => isPipeCompleted(p));
-  }, [task]);
-
   const getStopName = (stopId?: string): string => {
     if (!stopId) return '--';
     const stop = stops.find((s) => s.id === stopId);
@@ -70,11 +65,6 @@ export function MaintenanceReport({ taskId, onBack }: MaintenanceReportProps) {
     if (!stopId) return '#64748b';
     const stop = stops.find((s) => s.id === stopId);
     return stop ? STOP_CATEGORY_COLORS[stop.category] : '#64748b';
-  };
-
-  const formatTime = (isoString: string): string => {
-    const date = new Date(isoString);
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   };
 
   const formatDateTime = (isoString: string): string => {
