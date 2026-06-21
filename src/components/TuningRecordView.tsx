@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
-import type { MaintenanceTask, PipeRecord } from '../types/maintenance';
+import { useState, useEffect, useMemo } from 'react';
+import type { MaintenanceTask, PipeRecord, TemperatureHumidityRecord } from '../types/maintenance';
 import { maintenanceService } from '../services/maintenanceService';
 import { stopService } from '../services/stopService';
 import type { Stop } from '../types/stops';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from '../types/stops';
+import { TemperatureHumidityRecorder } from './TemperatureHumidityRecorder';
 
 interface TuningRecordViewProps {
   taskId: string;
   onBack: () => void;
+  onViewReport?: () => void;
 }
 
 interface PipeFormData {
@@ -122,6 +124,20 @@ export function TuningRecordView({ taskId, onBack }: TuningRecordViewProps) {
     return task.pipeRecords.filter((p) => p.centDeviation !== undefined && Math.abs(p.centDeviation) > 5).length;
   };
 
+  const latestTH = useMemo<TemperatureHumidityRecord | undefined>(() => {
+    if (!task || !task.temperatureHumidityRecords || task.temperatureHumidityRecords.length === 0) {
+      return undefined;
+    }
+    const sorted = [...task.temperatureHumidityRecords].sort(
+      (a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()
+    );
+    return sorted[0];
+  }, [task]);
+
+  const handleTHRecordAdded = () => {
+    loadTask();
+  };
+
   if (!task) {
     return (
       <main className="app">
@@ -164,11 +180,15 @@ export function TuningRecordView({ taskId, onBack }: TuningRecordViewProps) {
         </article>
         <article style={{ borderTopColor: '#0ea5e9' }}>
           <small>当前温度</small>
-          <strong style={{ color: '#0ea5e9' }}>-°C</strong>
+          <strong style={{ color: '#0ea5e9' }}>
+            {latestTH ? `${latestTH.temperature.toFixed(1)}°C` : '-°C'}
+          </strong>
         </article>
         <article style={{ borderTopColor: '#475569' }}>
           <small>当前湿度</small>
-          <strong style={{ color: '#475569' }}>-%</strong>
+          <strong style={{ color: '#475569' }}>
+            {latestTH ? `${latestTH.humidity.toFixed(0)}%` : '-%'}
+          </strong>
         </article>
       </section>
 
@@ -300,6 +320,98 @@ export function TuningRecordView({ taskId, onBack }: TuningRecordViewProps) {
                 </div>
               );
             })}
+          </div>
+        )}
+      </section>
+
+      <TemperatureHumidityRecorder taskId={taskId} onRecordAdded={handleTHRecordAdded} />
+
+      <section className="panel report-panel">
+        <div className="heading">
+          <div>
+            <p>维护报告</p>
+            <h2>任务摘要</h2>
+          </div>
+          <button
+            className="primary"
+            onClick={() => window.print()}
+            style={{ background: 'var(--primary)', borderColor: 'var(--primary)' }}
+          >
+            📄 打印报告
+          </button>
+        </div>
+        <div className="report-summary-grid">
+          <div className="report-summary-item">
+            <span className="report-summary-label">场馆</span>
+            <span className="report-summary-value">{task.venueName}</span>
+          </div>
+          <div className="report-summary-item">
+            <span className="report-summary-label">维护日期</span>
+            <span className="report-summary-value">{task.maintenanceDate}</span>
+          </div>
+          <div className="report-summary-item">
+            <span className="report-summary-label">参与人员</span>
+            <span className="report-summary-value">{task.participants}</span>
+          </div>
+          <div className="report-summary-item">
+            <span className="report-summary-label">音管总数</span>
+            <span className="report-summary-value">{totalCount} 支</span>
+          </div>
+          <div className="report-summary-item">
+            <span className="report-summary-label">已完成</span>
+            <span className="report-summary-value" style={{ color: '#059669' }}>
+              {completedCount} 支
+            </span>
+          </div>
+          <div className="report-summary-item">
+            <span className="report-summary-label">偏差超限</span>
+            <span className="report-summary-value" style={{ color: '#dc2626' }}>
+              {deviationCount} 支
+            </span>
+          </div>
+        </div>
+
+        {task.temperatureHumidityRecords && task.temperatureHumidityRecords.length > 0 && (
+          <div className="report-th-section">
+            <h3>温湿度统计</h3>
+            <div className="report-th-grid">
+              <div className="report-th-card">
+                <span className="report-th-label">最高温度</span>
+                <span className="report-th-value temp-high">
+                  {Math.max(...task.temperatureHumidityRecords.map((r) => r.temperature)).toFixed(1)}°C
+                </span>
+              </div>
+              <div className="report-th-card">
+                <span className="report-th-label">最低温度</span>
+                <span className="report-th-value temp-low">
+                  {Math.min(...task.temperatureHumidityRecords.map((r) => r.temperature)).toFixed(1)}°C
+                </span>
+              </div>
+              <div className="report-th-card">
+                <span className="report-th-label">最高湿度</span>
+                <span className="report-th-value humidity-high">
+                  {Math.max(...task.temperatureHumidityRecords.map((r) => r.humidity)).toFixed(0)}%
+                </span>
+              </div>
+              <div className="report-th-card">
+                <span className="report-th-label">最低湿度</span>
+                <span className="report-th-value humidity-low">
+                  {Math.min(...task.temperatureHumidityRecords.map((r) => r.humidity)).toFixed(0)}%
+                </span>
+              </div>
+              <div className="report-th-card">
+                <span className="report-th-label">最后一次读数</span>
+                <span className="report-th-value">
+                  {latestTH?.temperature.toFixed(1)}°C / {latestTH?.humidity.toFixed(0)}%
+                </span>
+              </div>
+              <div className="report-th-card">
+                <span className="report-th-label">记录次数</span>
+                <span className="report-th-value">
+                  {task.temperatureHumidityRecords.length} 次
+                </span>
+              </div>
+            </div>
           </div>
         )}
       </section>

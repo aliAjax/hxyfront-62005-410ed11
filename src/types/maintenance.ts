@@ -1,3 +1,11 @@
+export interface TemperatureHumidityRecord {
+  id: string;
+  temperature: number;
+  humidity: number;
+  recordedAt: string;
+  note?: string;
+}
+
 export interface PipeRecord {
   id: string;
   pipeNumber: string;
@@ -21,6 +29,7 @@ export interface MaintenanceTask {
   participants: string;
   pipeNumbers: string[];
   pipeRecords: PipeRecord[];
+  temperatureHumidityRecords: TemperatureHumidityRecord[];
   createdAt: string;
   updatedAt: string;
 }

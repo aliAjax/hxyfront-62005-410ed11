@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { MaintenanceTask, PipeRecord } from '../types/maintenance';
+import type { MaintenanceTask, PipeRecord, TemperatureHumidityRecord } from '../types/maintenance';
 import { maintenanceService } from '../services/maintenanceService';
 import { stopService } from '../services/stopService';
 import type { Stop, StopCategory } from '../types/stops';
@@ -163,6 +163,16 @@ export function TuningDeviationEntry({ onBack }: TuningDeviationEntryProps) {
     }
   };
 
+  const latestTH = useMemo<TemperatureHumidityRecord | undefined>(() => {
+    if (!currentTask || !currentTask.temperatureHumidityRecords || currentTask.temperatureHumidityRecords.length === 0) {
+      return undefined;
+    }
+    const sorted = [...currentTask.temperatureHumidityRecords].sort(
+      (a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()
+    );
+    return sorted[0];
+  }, [currentTask]);
+
   const totalPipes = currentTask?.pipeRecords.length || 0;
   const completedPipes = currentTask?.pipeRecords.filter(
     (p) => p.pitch || p.centDeviation !== undefined
@@ -249,6 +259,21 @@ export function TuningDeviationEntry({ onBack }: TuningDeviationEntryProps) {
               <div>
                 <p>{currentTask.venueName}</p>
                 <h2>调音偏差数据表</h2>
+                {latestTH && (
+                  <div className="deviation-th-info">
+                    <span className="th-info-item">
+                      <span className="th-info-label">当前温度：</span>
+                      <span className="th-info-value temp-value">{latestTH.temperature.toFixed(1)}°C</span>
+                    </span>
+                    <span className="th-info-item">
+                      <span className="th-info-label">当前湿度：</span>
+                      <span className="th-info-value humidity-value">{latestTH.humidity.toFixed(0)}%</span>
+                    </span>
+                    <span className="th-info-time">
+                      (最近记录：{new Date(latestTH.recordedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })})
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="category-tabs" style={{ margin: 0, padding: 0, border: 'none' }}>
                 {([
