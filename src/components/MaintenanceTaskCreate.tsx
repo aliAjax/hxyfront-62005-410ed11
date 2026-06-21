@@ -1,24 +1,74 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { MaintenanceTaskFormData } from '../types/maintenance';
 import { DEFAULT_MAINTENANCE_FORM_DATA } from '../types/maintenance';
 import { venueService } from '../services/venueService';
 import { maintenanceService } from '../services/maintenanceService';
+import { draftService } from '../services/draftService';
 import type { Venue } from '../types/venue';
 
 interface MaintenanceTaskCreateProps {
   onBack: () => void;
   onTaskCreated: (taskId: string) => void;
+  restoreFromDraft?: boolean;
 }
 
-export function MaintenanceTaskCreate({ onBack, onTaskCreated }: MaintenanceTaskCreateProps) {
+export function MaintenanceTaskCreate({ onBack, onTaskCreated, restoreFromDraft }: MaintenanceTaskCreateProps) {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [formData, setFormData] = useState<MaintenanceTaskFormData>(DEFAULT_MAINTENANCE_FORM_DATA);
   const [bulkInput, setBulkInput] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showDraftRestore, setShowDraftRestore] = useState(false);
+  const [lastSaved, setLastSaved] = useState<string>('');
+  const saveTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     setVenues(venueService.getAll());
   }, []);
+
+  useEffect(() => {
+    if (restoreFromDraft) {
+      restoreDraft();
+    } else {
+      const draft = draftService.getMaintenanceTaskDraft();
+      if (draft) {
+        setShowDraftRestore(true);
+      }
+    }
+  }, [restoreFromDraft]);
+
+  useEffect(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = window.setTimeout(() => {
+      saveDraft();
+    }, 500);
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [formData]);
+
+  const saveDraft = () => {
+    const venue = venues.find((v) => v.id === formData.venueId);
+    draftService.saveMaintenanceTaskDraft(formData, venue?.name);
+    setLastSaved(new Date().toLocaleTimeString('zh-CN'));
+  };
+
+  const restoreDraft = () => {
+    const draft = draftService.getMaintenanceTaskDraft();
+    if (draft) {
+      setFormData(draft.data);
+      setLastSaved(new Date(draft.updatedAt).toLocaleTimeString('zh-CN'));
+    }
+    setShowDraftRestore(false);
+  };
+
+  const clearDraft = () => {
+    draftService.deleteMaintenanceTaskDraft();
+    setLastSaved('');
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -98,6 +148,7 @@ export function MaintenanceTaskCreate({ onBack, onTaskCreated }: MaintenanceTask
     if (!validateForm()) return;
 
     const newTask = maintenanceService.create(formData);
+    clearDraft();
     onTaskCreated(newTask.id);
   };
 
@@ -112,6 +163,11 @@ export function MaintenanceTaskCreate({ onBack, onTaskCreated }: MaintenanceTask
         <p>单次维护任务</p>
         <h1>创建维护任务</h1>
         <span>选择场馆、维护日期和参与人员，批量添加需要检查的音管编号，创建后进入调音记录视图开始工作。</span>
+        {lastSaved && (
+          <p style={{ marginTop: '8px', color: '#64748b', fontSize: '13px' }}>
+            💾 草稿已自动保存于 {lastSaved}
+          </p>
+        )}
       </section>
 
       <form onSubmit={handleSubmit}>
@@ -271,6 +327,35 @@ export function MaintenanceTaskCreate({ onBack, onTaskCreated }: MaintenanceTask
           </div>
         </section>
       </form>
+
+      {showDraftRestore && (
+        <div className="modal-overlay" onClick={() => setShowDraftRestore(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <div className="modal-header">
+              <h2>发现未保存的草稿</h2>
+              <button className="close-btn" onClick={() => setShowDraftRestore(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: '0 0 12px 0' }}>
+                检测到上次未完成的维护任务草稿，是否恢复？
+              </p>
+              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                💡 提示：草稿仅保存在本地浏览器中
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowDraftRestore(false)}>
+                放弃草稿
+              </button>
+              <button className="primary" onClick={restoreDraft}>
+                恢复草稿
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

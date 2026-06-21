@@ -7,15 +7,17 @@ import { TuningRecordView } from './components/TuningRecordView';
 import { TuningDeviationEntry } from './components/TuningDeviationEntry';
 import { MaintenanceReport } from './components/MaintenanceReport';
 import { ReinspectionDashboard } from './components/ReinspectionDashboard';
+import { DraftList } from './components/DraftList';
 import { venueService } from './services/venueService';
 import { stopService } from './services/stopService';
 import { maintenanceService } from './services/maintenanceService';
+import { draftService } from './services/draftService';
 import type { Venue } from './types/venue';
 import type { StopCategory } from './types/stops';
 import type { MaintenanceTask } from './types/maintenance';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from './types/stops';
 
-type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation' | 'maintenance-report' | 'reinspection' | 'report-selector';
+type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation' | 'maintenance-report' | 'reinspection' | 'report-selector' | 'drafts';
 
 const project = {
   "sourceNo": 7,
@@ -90,6 +92,11 @@ function App() {
   const [activeFilter, setActiveFilter] = useState<StopCategory | 'all'>('all');
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [maintenanceTasks, setMaintenanceTasks] = useState<MaintenanceTask[]>([]);
+  const [draftVenueEditingId, setDraftVenueEditingId] = useState<string | undefined>(undefined);
+  const [restoreVenueDraft, setRestoreVenueDraft] = useState(false);
+  const [restoreTaskDraft, setRestoreTaskDraft] = useState(false);
+  const [restoreTuningDraft, setRestoreTuningDraft] = useState(false);
+  const [restoreReportDraft, setRestoreReportDraft] = useState(false);
 
   useEffect(() => {
     loadVenues();
@@ -163,8 +170,54 @@ function App() {
     return stops.filter((s) => s.category === activeFilter);
   };
 
+  const handleContinueVenueDraft = (editingId?: string) => {
+    setDraftVenueEditingId(editingId);
+    setRestoreVenueDraft(true);
+    setCurrentPage('venues');
+  };
+
+  const handleContinueTaskDraft = () => {
+    setRestoreTaskDraft(true);
+    setCurrentPage('create-task');
+  };
+
+  const handleContinueTuningDraft = (taskId: string) => {
+    setCurrentTaskId(taskId);
+    setRestoreTuningDraft(true);
+    setCurrentPage('tuning-record');
+  };
+
+  const handleContinueReportDraft = (taskId: string) => {
+    setCurrentTaskId(taskId);
+    setRestoreReportDraft(true);
+    setCurrentPage('maintenance-report');
+  };
+
+  if (currentPage === 'drafts') {
+    return (
+      <DraftList
+        onBack={() => setCurrentPage('workspace')}
+        onContinueVenueDraft={handleContinueVenueDraft}
+        onContinueTaskDraft={handleContinueTaskDraft}
+        onContinueTuningDraft={handleContinueTuningDraft}
+        onContinueReportDraft={handleContinueReportDraft}
+      />
+    );
+  }
+
   if (currentPage === 'venues') {
-    return <VenueManagement onBack={() => setCurrentPage('workspace')} />;
+    return (
+      <VenueManagement
+        onBack={() => {
+          setDraftVenueEditingId(undefined);
+          setRestoreVenueDraft(false);
+          setCurrentPage('workspace');
+        }}
+        draftEditingId={draftVenueEditingId}
+        onGoToDrafts={() => setCurrentPage('drafts')}
+        restoreFromDraft={restoreVenueDraft}
+      />
+    );
   }
 
   if (currentPage === 'stops') {
@@ -174,11 +227,16 @@ function App() {
   if (currentPage === 'create-task') {
     return (
       <MaintenanceTaskCreate
-        onBack={() => setCurrentPage('workspace')}
+        onBack={() => {
+          setRestoreTaskDraft(false);
+          setCurrentPage('workspace');
+        }}
         onTaskCreated={(taskId) => {
+          setRestoreTaskDraft(false);
           setCurrentTaskId(taskId);
           setCurrentPage('tuning-record');
         }}
+        restoreFromDraft={restoreTaskDraft}
       />
     );
   }
@@ -187,8 +245,12 @@ function App() {
     return (
       <TuningRecordView
         taskId={currentTaskId}
-        onBack={() => setCurrentPage('workspace')}
+        onBack={() => {
+          setRestoreTuningDraft(false);
+          setCurrentPage('workspace');
+        }}
         onViewReport={() => setCurrentPage('maintenance-report')}
+        restoreFromDraft={restoreTuningDraft}
       />
     );
   }
@@ -205,7 +267,11 @@ function App() {
     return (
       <MaintenanceReport
         taskId={currentTaskId}
-        onBack={() => setCurrentPage('tuning-record')}
+        onBack={() => {
+          setRestoreReportDraft(false);
+          setCurrentPage('tuning-record');
+        }}
+        restoreFromDraft={restoreReportDraft}
       />
     );
   }
@@ -410,6 +476,9 @@ function App() {
             </button>
             <button className="primary full-width" style={{ marginTop: '10px', background: '#f59e0b', borderColor: '#f59e0b' }} onClick={() => setCurrentPage('reinspection')}>
               🔍 异常音管复检看板
+            </button>
+            <button className="primary full-width" style={{ marginTop: '10px', background: '#7c3aed', borderColor: '#7c3aed' }} onClick={() => setCurrentPage('drafts')}>
+              📝 本地草稿管理
             </button>
           </div>
 

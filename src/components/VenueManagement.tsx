@@ -1,30 +1,108 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Venue, VenueFormData } from '../types/venue';
 import { VENUE_TYPE_LABELS, DEFAULT_VENUE_FORM_DATA } from '../types/venue';
 import { venueService } from '../services/venueService';
+import { draftService } from '../services/draftService';
 
 interface VenueManagementProps {
   onBack: () => void;
+  draftEditingId?: string;
+  onGoToDrafts?: () => void;
+  restoreFromDraft?: boolean;
 }
 
-export function VenueManagement({ onBack }: VenueManagementProps) {
+export function VenueManagement({ onBack, draftEditingId, onGoToDrafts, restoreFromDraft }: VenueManagementProps) {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
   const [formData, setFormData] = useState<VenueFormData>(DEFAULT_VENUE_FORM_DATA);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [showDraftRestore, setShowDraftRestore] = useState(false);
+  const [draftExists, setDraftExists] = useState(false);
+  const [lastSaved, setLastSaved] = useState<string>('');
+  const saveTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     loadVenues();
   }, []);
 
+  useEffect(() => {
+    if (restoreFromDraft) {
+      const draft = draftService.getVenueDraft(draftEditingId);
+      if (draft) {
+        if (draft.editingId) {
+          const venue = venueService.getById(draft.editingId);
+          if (venue) {
+            setEditingVenue(venue);
+          }
+        } else {
+          setEditingVenue(null);
+        }
+        setFormData(draft.data);
+        setLastSaved(new Date(draft.updatedAt).toLocaleTimeString('zh-CN'));
+        setShowForm(true);
+        setShowDraftRestore(false);
+      }
+    }
+  }, [restoreFromDraft, draftEditingId]);
+
+  useEffect(() => {
+    if (showForm && !restoreFromDraft) {
+      const draft = draftService.getVenueDraft(editingVenue?.id);
+      setDraftExists(!!draft);
+      if (draft) {
+        setShowDraftRestore(true);
+      }
+    }
+  }, [showForm, editingVenue, restoreFromDraft]);
+
+  useEffect(() => {
+    if (showForm && formData) {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      saveTimeoutRef.current = window.setTimeout(() => {
+        saveDraft();
+      }, 500);
+    }
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [formData, showForm]);
+
   const loadVenues = () => {
     setVenues(venueService.getAll());
+  };
+
+  const saveDraft = () => {
+    if (!showForm) return;
+    draftService.saveVenueDraft(formData, editingVenue?.id);
+    setLastSaved(new Date().toLocaleTimeString('zh-CN'));
+  };
+
+  const restoreDraft = (editingId?: string) => {
+    const draft = draftService.getVenueDraft(editingId);
+    if (draft) {
+      setFormData(draft.data);
+      setLastSaved(new Date(draft.updatedAt).toLocaleTimeString('zh-CN'));
+    }
+    setShowDraftRestore(false);
+  };
+
+  const clearDraft = () => {
+    draftService.deleteVenueDraft(editingVenue?.id);
+    setDraftExists(false);
+    setLastSaved('');
   };
 
   const handleAdd = () => {
     setEditingVenue(null);
     setFormData(DEFAULT_VENUE_FORM_DATA);
+    setShowDraftRestore(false);
+    setLastSaved('');
+    setDraftExists(false);
     setShowForm(true);
   };
 
@@ -40,6 +118,8 @@ export function VenueManagement({ onBack }: VenueManagementProps) {
       defaultHumidity: venue.defaultHumidity,
       remarks: venue.remarks,
     });
+    setShowDraftRestore(false);
+    setLastSaved('');
     setShowForm(true);
   };
 
@@ -57,8 +137,14 @@ export function VenueManagement({ onBack }: VenueManagementProps) {
     } else {
       venueService.create(formData);
     }
+    clearDraft();
     loadVenues();
     setShowForm(false);
+  };
+
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setShowDraftRestore(false);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -190,11 +276,18 @@ export function VenueManagement({ onBack }: VenueManagementProps) {
       </section>
 
       {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
+        <div className="modal-overlay" onClick={handleCloseForm}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingVenue ? '编辑场馆' : '新增场馆'}</h2>
-              <button className="close-btn" onClick={() => setShowForm(false)}>
+              <div>
+                <h2>{editingVenue ? '编辑场馆' : '新增场馆'}</h2>
+                {lastSaved && (
+                  <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '12px' }}>
+                    💾 草稿已自动保存于 {lastSaved}
+                  </p>
+                )}
+              </div>
+              <button className="close-btn" onClick={handleCloseForm}>
                 ×
               </button>
             </div>
@@ -293,14 +386,50 @@ export function VenueManagement({ onBack }: VenueManagementProps) {
               </div>
 
               <div className="modal-footer">
-                <button type="button" onClick={() => setShowForm(false)}>
-                  取消
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button type="button" onClick={handleCloseForm}>
+                    取消
+                  </button>
+                </div>
                 <button type="submit" className="primary">
                   {editingVenue ? '保存修改' : '创建场馆'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showDraftRestore && (
+        <div className="modal-overlay" onClick={() => setShowDraftRestore(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <div className="modal-header">
+              <h2>发现未保存的草稿</h2>
+              <button className="close-btn" onClick={() => setShowDraftRestore(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: '0 0 12px 0' }}>
+                检测到之前未完成的编辑草稿，是否恢复上次编辑内容？
+              </p>
+              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                💡 提示：草稿仅保存在本地浏览器中
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowDraftRestore(false)}>
+                放弃草稿
+              </button>
+              <button
+                className="primary"
+                onClick={() => {
+                  restoreDraft(editingVenue?.id);
+                }}
+              >
+                恢复草稿
+              </button>
+            </div>
           </div>
         </div>
       )}

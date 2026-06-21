@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { MaintenanceTask, PipeRecord, TemperatureHumidityRecord } from '../types/maintenance';
 import { maintenanceService } from '../services/maintenanceService';
 import { stopService } from '../services/stopService';
+import { draftService } from '../services/draftService';
 import type { Stop } from '../types/stops';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from '../types/stops';
 import { TemperatureHumidityRecorder } from './TemperatureHumidityRecorder';
@@ -10,6 +11,7 @@ interface TuningRecordViewProps {
   taskId: string;
   onBack: () => void;
   onViewReport?: () => void;
+  restoreFromDraft?: boolean;
 }
 
 interface PipeFormData {
@@ -32,12 +34,15 @@ const DEFAULT_PIPE_FORM_DATA: PipeFormData = {
   remarks: '',
 };
 
-export function TuningRecordView({ taskId, onBack, onViewReport }: TuningRecordViewProps) {
+export function TuningRecordView({ taskId, onBack, onViewReport, restoreFromDraft }: TuningRecordViewProps) {
   const [task, setTask] = useState<MaintenanceTask | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
   const [editingPipe, setEditingPipe] = useState<PipeRecord | null>(null);
   const [formData, setFormData] = useState<PipeFormData>(DEFAULT_PIPE_FORM_DATA);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [showDraftRestore, setShowDraftRestore] = useState(false);
+  const [lastSaved, setLastSaved] = useState<string>('');
+  const saveTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     loadTask();
@@ -49,6 +54,93 @@ export function TuningRecordView({ taskId, onBack, onViewReport }: TuningRecordV
     if (loadedTask) {
       setTask(loadedTask);
     }
+  };
+
+  useEffect(() => {
+    if (restoreFromDraft) {
+      restoreDraft();
+    } else if (task) {
+      const draft = draftService.getTuningRecordDraft(taskId);
+      if (draft) {
+        setShowDraftRestore(true);
+      }
+    }
+  }, [taskId, task, restoreFromDraft]);
+
+  useEffect(() => {
+    if (!task) return;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = window.setTimeout(() => {
+      saveDraft();
+    }, 1000);
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [task?.pipeRecords, task?.temperatureHumidityRecords]);
+
+  const saveDraft = () => {
+    if (!task) return;
+    draftService.saveTuningRecordDraft({
+      taskId: task.id,
+      venueName: task.venueName,
+      pipeRecords: task.pipeRecords.map((p) => ({
+        id: p.id,
+        pipeNumber: p.pipeNumber,
+        stopId: p.stopId,
+        stopName: p.stopName,
+        pitch: p.pitch,
+        centDeviation: p.centDeviation,
+        temperature: p.temperature,
+        humidity: p.humidity,
+        reedStatus: p.reedStatus,
+        remarks: p.remarks,
+      })),
+      temperatureHumidityRecords: task.temperatureHumidityRecords,
+    });
+    setLastSaved(new Date().toLocaleTimeString('zh-CN'));
+  };
+
+  const restoreDraft = () => {
+    const draft = draftService.getTuningRecordDraft(taskId);
+    if (draft && task) {
+      const updatedTask = {
+        ...task,
+        pipeRecords: task.pipeRecords.map((p) => {
+          const draftPipe = draft.data.pipeRecords.find((dp) => dp.id === p.id);
+          if (draftPipe) {
+            return {
+              ...p,
+              stopId: draftPipe.stopId,
+              stopName: draftPipe.stopName,
+              pitch: draftPipe.pitch,
+              centDeviation: draftPipe.centDeviation,
+              temperature: draftPipe.temperature,
+              humidity: draftPipe.humidity,
+              reedStatus: draftPipe.reedStatus,
+              remarks: draftPipe.remarks,
+            };
+          }
+          return p;
+        }),
+        temperatureHumidityRecords: draft.data.temperatureHumidityRecords,
+      };
+      maintenanceService.update(taskId, {
+        pipeRecords: updatedTask.pipeRecords,
+        temperatureHumidityRecords: updatedTask.temperatureHumidityRecords,
+      });
+      setTask(updatedTask);
+      setLastSaved(new Date(draft.updatedAt).toLocaleTimeString('zh-CN'));
+    }
+    setShowDraftRestore(false);
+  };
+
+  const clearDraft = () => {
+    draftService.deleteTuningRecordDraft(taskId);
+    setLastSaved('');
   };
 
   const handleEditPipe = (pipe: PipeRecord) => {
@@ -165,6 +257,11 @@ export function TuningRecordView({ taskId, onBack, onViewReport }: TuningRecordV
         <span>
           参与人员：{task.participants} · 共 {task.pipeNumbers.length} 支音管待调音
         </span>
+        {lastSaved && (
+          <p style={{ marginTop: '8px', color: '#64748b', fontSize: '13px' }}>
+            💾 草稿已自动保存于 {lastSaved}
+          </p>
+        )}
       </section>
 
       <section className="metrics">
@@ -539,6 +636,35 @@ export function TuningRecordView({ taskId, onBack, onViewReport }: TuningRecordV
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showDraftRestore && (
+        <div className="modal-overlay" onClick={() => setShowDraftRestore(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+            <div className="modal-header">
+              <h2>发现未保存的草稿</h2>
+              <button className="close-btn" onClick={() => setShowDraftRestore(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: '0 0 12px 0' }}>
+                检测到上次未完成的调音记录草稿，是否恢复？
+              </p>
+              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                ⚠️ 恢复草稿将覆盖当前已保存的调音记录数据
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowDraftRestore(false)}>
+                放弃草稿
+              </button>
+              <button className="primary" onClick={restoreDraft}>
+                恢复草稿
+              </button>
+            </div>
           </div>
         </div>
       )}

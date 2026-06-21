@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { MaintenanceTask, PipeRecord, AbnormalReason } from '../types/maintenance';
 import { maintenanceService } from '../services/maintenanceService';
 import { stopService } from '../services/stopService';
 import { venueService } from '../services/venueService';
+import { draftService } from '../services/draftService';
 import type { Stop } from '../types/stops';
 import type { Venue } from '../types/venue';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from '../types/stops';
@@ -11,9 +12,10 @@ import { VENUE_TYPE_LABELS } from '../types/venue';
 interface MaintenanceReportProps {
   taskId: string;
   onBack: () => void;
+  restoreFromDraft?: boolean;
 }
 
-export function MaintenanceReport({ taskId, onBack }: MaintenanceReportProps) {
+export function MaintenanceReport({ taskId, onBack, restoreFromDraft }: MaintenanceReportProps) {
   const [task, setTask] = useState<MaintenanceTask | null>(null);
   const [venue, setVenue] = useState<Venue | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -23,6 +25,9 @@ export function MaintenanceReport({ taskId, onBack }: MaintenanceReportProps) {
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [summaryDraft, setSummaryDraft] = useState('');
   const [notesDraft, setNotesDraft] = useState('');
+  const [showDraftRestore, setShowDraftRestore] = useState(false);
+  const [lastSaved, setLastSaved] = useState<string>('');
+  const saveTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     loadTask();
@@ -42,6 +47,62 @@ export function MaintenanceReport({ taskId, onBack }: MaintenanceReportProps) {
         if (v) setVenue(v);
       }
     }
+  };
+
+  useEffect(() => {
+    if (restoreFromDraft) {
+      restoreDraft();
+    } else if (task) {
+      const draft = draftService.getMaintenanceReportDraft(taskId);
+      if (draft) {
+        setShowDraftRestore(true);
+      }
+    }
+  }, [taskId, task, restoreFromDraft]);
+
+  useEffect(() => {
+    if (!isEditingSummary && !isEditingNotes) return;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = window.setTimeout(() => {
+      saveDraft();
+    }, 500);
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [summaryDraft, notesDraft, isEditingSummary, isEditingNotes]);
+
+  const saveDraft = () => {
+    if (!task) return;
+    draftService.saveMaintenanceReportDraft({
+      taskId: task.id,
+      venueName: task.venueName,
+      reportSummary: summaryDraft,
+      maintenanceNotes: notesDraft,
+    });
+    setLastSaved(new Date().toLocaleTimeString('zh-CN'));
+  };
+
+  const restoreDraft = () => {
+    const draft = draftService.getMaintenanceReportDraft(taskId);
+    if (draft) {
+      setSummaryDraft(draft.data.reportSummary);
+      setNotesDraft(draft.data.maintenanceNotes);
+      setSummary(draft.data.reportSummary);
+      setMaintenanceNotes(draft.data.maintenanceNotes);
+      maintenanceService.updateReportSummary(taskId, draft.data.reportSummary);
+      maintenanceService.updateMaintenanceNotes(taskId, draft.data.maintenanceNotes);
+      setLastSaved(new Date(draft.updatedAt).toLocaleTimeString('zh-CN'));
+    }
+    setShowDraftRestore(false);
+  };
+
+  const clearDraft = () => {
+    draftService.deleteMaintenanceReportDraft(taskId);
+    setLastSaved('');
   };
 
   const isPipeCompleted = (pipe: PipeRecord): boolean => {
@@ -109,6 +170,7 @@ export function MaintenanceReport({ taskId, onBack }: MaintenanceReportProps) {
     maintenanceService.updateReportSummary(taskId, summaryDraft);
     setSummary(summaryDraft);
     setIsEditingSummary(false);
+    clearDraft();
     loadTask();
   };
 
@@ -121,6 +183,7 @@ export function MaintenanceReport({ taskId, onBack }: MaintenanceReportProps) {
     maintenanceService.updateMaintenanceNotes(taskId, notesDraft);
     setMaintenanceNotes(notesDraft);
     setIsEditingNotes(false);
+    clearDraft();
     loadTask();
   };
 
@@ -159,6 +222,11 @@ export function MaintenanceReport({ taskId, onBack }: MaintenanceReportProps) {
           <span style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
             {VENUE_TYPE_LABELS[venue.type]} · {venue.address}
           </span>
+        )}
+        {lastSaved && (
+          <p style={{ marginTop: '8px', color: '#64748b', fontSize: '13px' }}>
+            💾 草稿已自动保存于 {lastSaved}
+          </p>
         )}
         <div className="report-actions">
           <button
@@ -572,6 +640,35 @@ export function MaintenanceReport({ taskId, onBack }: MaintenanceReportProps) {
           </div>
         </div>
       </section>
+
+      {showDraftRestore && (
+        <div className="modal-overlay" onClick={() => setShowDraftRestore(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+            <div className="modal-header">
+              <h2>发现未保存的草稿</h2>
+              <button className="close-btn" onClick={() => setShowDraftRestore(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: '0 0 12px 0' }}>
+                检测到上次未完成的报告草稿，是否恢复？
+              </p>
+              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                ⚠️ 恢复草稿将覆盖当前已保存的报告内容
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowDraftRestore(false)}>
+                放弃草稿
+              </button>
+              <button className="primary" onClick={restoreDraft}>
+                恢复草稿
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
