@@ -9,11 +9,13 @@ import { MaintenanceReport } from './components/MaintenanceReport';
 import { ReinspectionDashboard } from './components/ReinspectionDashboard';
 import { venueService } from './services/venueService';
 import { stopService } from './services/stopService';
+import { maintenanceService } from './services/maintenanceService';
 import type { Venue } from './types/venue';
 import type { StopCategory } from './types/stops';
+import type { MaintenanceTask } from './types/maintenance';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from './types/stops';
 
-type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation' | 'maintenance-report' | 'reinspection';
+type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation' | 'maintenance-report' | 'reinspection' | 'report-selector';
 
 const project = {
   "sourceNo": 7,
@@ -87,10 +89,12 @@ function App() {
   const [selectedStopId, setSelectedStopId] = useState<string>('');
   const [activeFilter, setActiveFilter] = useState<StopCategory | 'all'>('all');
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [maintenanceTasks, setMaintenanceTasks] = useState<MaintenanceTask[]>([]);
 
   useEffect(() => {
     loadVenues();
     loadStops();
+    loadMaintenanceTasks();
   }, [currentPage]);
 
   const loadVenues = () => {
@@ -99,6 +103,12 @@ function App() {
 
   const loadStops = () => {
     setStops(stopService.getAllDisplayLabels());
+  };
+
+  const loadMaintenanceTasks = () => {
+    setMaintenanceTasks(maintenanceService.getAll().sort((a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    ));
   };
 
   const handleVenueSelect = (venueId: string) => {
@@ -208,6 +218,129 @@ function App() {
     );
   }
 
+  if (currentPage === 'report-selector') {
+    return (
+      <main className="app">
+        <section className="hero venue-hero">
+          <button className="back-btn" onClick={() => setCurrentPage('workspace')}>
+            ← 返回工作台
+          </button>
+          <p>维护报告中心</p>
+          <h1>选择维护任务</h1>
+          <span>从已有的维护任务中选择一个，生成或查看对应的维护报告</span>
+        </section>
+
+        <section className="panel">
+          <div className="heading">
+            <div>
+              <p>任务列表</p>
+              <h2>历史维护任务</h2>
+              <p style={{ marginTop: '4px', color: '#64748b', fontSize: '13px' }}>
+                共 {maintenanceTasks.length} 个维护任务
+              </p>
+            </div>
+          </div>
+
+          {maintenanceTasks.length === 0 ? (
+            <div className="empty-state">
+              <p>暂无维护任务，请先创建维护任务</p>
+              <button
+                className="primary"
+                onClick={() => setCurrentPage('create-task')}
+                style={{ marginTop: '12px' }}
+              >
+                📋 创建维护任务
+              </button>
+            </div>
+          ) : (
+            <div className="venue-list">
+              {maintenanceTasks.map((task) => {
+                const abnormalCount = task.pipeRecords.filter(
+                  (p) => maintenanceService.isPipeAbnormal(p)
+                ).length;
+                const completedCount = task.pipeRecords.filter(
+                  (p) => p.pitch || p.centDeviation !== undefined || p.remarks
+                ).length;
+                return (
+                  <div key={task.id} className="venue-card">
+                    <div className="venue-card-header">
+                      <div>
+                        <span className="venue-type church" style={{ background: 'color-mix(in srgb, var(--accent) 15%, #ffffff)', color: 'var(--accent)' }}>
+                          {task.maintenanceDate}
+                        </span>
+                        <h3>{task.venueName}</h3>
+                        <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '13px' }}>
+                          参与人员：{task.participants}
+                        </p>
+                      </div>
+                      <div className="venue-actions">
+                        <button
+                          className="action-btn edit-btn"
+                          onClick={() => {
+                            setCurrentTaskId(task.id);
+                            setCurrentPage('tuning-record');
+                          }}
+                        >
+                          📝 调音记录
+                        </button>
+                        <button
+                          className="primary"
+                          style={{ background: 'var(--primary)', borderColor: 'var(--primary)' }}
+                          onClick={() => {
+                            setCurrentTaskId(task.id);
+                            setCurrentPage('maintenance-report');
+                          }}
+                        >
+                          📑 生成报告
+                        </button>
+                      </div>
+                    </div>
+                    <div className="venue-info">
+                      <div className="info-item">
+                        <span className="info-label">音管总数</span>
+                        <span className="info-value">{task.pipeRecords.length} 支</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">已完成</span>
+                        <span className="info-value" style={{ color: '#059669' }}>
+                          {completedCount} 支
+                        </span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">异常音管</span>
+                        <span className="info-value" style={{ color: '#dc2626' }}>
+                          {abnormalCount} 支
+                        </span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">温湿度记录</span>
+                        <span className="info-value">
+                          {task.temperatureHumidityRecords?.length || 0} 条
+                        </span>
+                      </div>
+                    </div>
+                    {(task.reportSummary || task.maintenanceNotes) && (
+                      <p className="venue-remarks">
+                        <strong>已有报告内容：</strong>
+                        {task.reportSummary
+                          ? `摘要：${task.reportSummary.slice(0, 80)}${task.reportSummary.length > 80 ? '...' : ''}`
+                          : ''}
+                        {task.reportSummary && task.maintenanceNotes ? ' | ' : ''}
+                        {task.maintenanceNotes
+                          ? `备注：${task.maintenanceNotes.slice(0, 80)}${task.maintenanceNotes.length > 80 ? '...' : ''}`
+                          : ''}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="app">
       <section className="hero">
@@ -262,6 +395,9 @@ function App() {
           <div className="quick-actions">
             <button className="primary full-width" style={{ background: 'var(--accent)', borderColor: 'var(--accent)' }} onClick={() => setCurrentPage('create-task')}>
               📋 创建维护任务
+            </button>
+            <button className="primary full-width" style={{ marginTop: '10px', background: 'var(--primary)', borderColor: 'var(--primary)' }} onClick={() => setCurrentPage('report-selector')}>
+              📑 生成维护报告
             </button>
             <button className="primary full-width" style={{ marginTop: '10px', background: '#dc2626', borderColor: '#dc2626' }} onClick={() => setCurrentPage('tuning-deviation')}>
               🎯 调音偏差录入

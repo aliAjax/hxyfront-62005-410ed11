@@ -272,4 +272,59 @@ export const maintenanceService = {
       byReason,
     };
   },
+
+  updateReportSummary(taskId: string, summary: string): MaintenanceTask | undefined {
+    return this.update(taskId, { reportSummary: summary });
+  },
+
+  updateMaintenanceNotes(taskId: string, notes: string): MaintenanceTask | undefined {
+    return this.update(taskId, { maintenanceNotes: notes });
+  },
+
+  getStopStats(taskId: string): {
+    totalUniqueStops: number;
+    byStop: Array<{ stopId?: string; stopName: string; count: number; abnormalCount: number }>;
+  } {
+    const task = this.getById(taskId);
+    if (!task) {
+      return { totalUniqueStops: 0, byStop: [] };
+    }
+
+    const stopMap = new Map<string, { stopId?: string; stopName: string; count: number; abnormalCount: number }>();
+
+    for (const pipe of task.pipeRecords) {
+      const key = pipe.stopId || '__no_stop__';
+      const displayName = pipe.stopName || (pipe.stopId ? `音栓#${pipe.stopId}` : '未指定音栓');
+
+      if (!stopMap.has(key)) {
+        stopMap.set(key, {
+          stopId: pipe.stopId,
+          stopName: displayName,
+          count: 0,
+          abnormalCount: 0,
+        });
+      }
+
+      const entry = stopMap.get(key)!;
+      entry.count++;
+      if (this.isPipeAbnormal(pipe)) {
+        entry.abnormalCount++;
+      }
+    }
+
+    const byStop = Array.from(stopMap.values()).sort((a, b) => b.count - a.count);
+    return {
+      totalUniqueStops: byStop.filter((s) => s.stopId).length,
+      byStop,
+    };
+  },
+
+  getAbnormalReasonLabel(reason: AbnormalReason): string {
+    const labels: Record<AbnormalReason, string> = {
+      deviation: '音分偏差超限',
+      reed_adjust: '簧片需微调',
+      recheck_mark: '标记复检',
+    };
+    return labels[reason];
+  },
 };

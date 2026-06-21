@@ -42,6 +42,8 @@ export interface MaintenanceTask {
   pipeNumbers: string[];
   pipeRecords: PipeRecord[];
   temperatureHumidityRecords: TemperatureHumidityRecord[];
+  reportSummary?: string;
+  maintenanceNotes?: string;
   createdAt: string;
   updatedAt: string;
 }
