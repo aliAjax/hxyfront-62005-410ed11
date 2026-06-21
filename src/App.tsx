@@ -4,13 +4,14 @@ import { VenueManagement } from './components/VenueManagement';
 import { StopManagement } from './components/StopManagement';
 import { MaintenanceTaskCreate } from './components/MaintenanceTaskCreate';
 import { TuningRecordView } from './components/TuningRecordView';
+import { TuningDeviationEntry } from './components/TuningDeviationEntry';
 import { venueService } from './services/venueService';
 import { stopService } from './services/stopService';
 import type { Venue } from './types/venue';
 import type { StopCategory } from './types/stops';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from './types/stops';
 
-type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record';
+type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation';
 
 const project = {
   "sourceNo": 7,
@@ -179,6 +180,14 @@ function App() {
     );
   }
 
+  if (currentPage === 'tuning-deviation') {
+    return (
+      <TuningDeviationEntry
+        onBack={() => setCurrentPage('workspace')}
+      />
+    );
+  }
+
   return (
     <main className="app">
       <section className="hero">
@@ -233,6 +242,9 @@ function App() {
           <div className="quick-actions">
             <button className="primary full-width" style={{ background: 'var(--accent)', borderColor: 'var(--accent)' }} onClick={() => setCurrentPage('create-task')}>
               📋 创建维护任务
+            </button>
+            <button className="primary full-width" style={{ marginTop: '10px', background: '#dc2626', borderColor: '#dc2626' }} onClick={() => setCurrentPage('tuning-deviation')}>
+              🎯 调音偏差录入
             </button>
             <button className="primary full-width" style={{ marginTop: '10px' }} onClick={() => setCurrentPage('venues')}>
               🏛️ 场馆档案管理
