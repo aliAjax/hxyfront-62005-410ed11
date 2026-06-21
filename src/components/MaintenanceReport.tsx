@@ -27,6 +27,7 @@ export function MaintenanceReport({ taskId, onBack, restoreFromDraft }: Maintena
   const [notesDraft, setNotesDraft] = useState('');
   const [showDraftRestore, setShowDraftRestore] = useState(false);
   const [lastSaved, setLastSaved] = useState<string>('');
+  const [isDraftMode, setIsDraftMode] = useState(false);
   const saveTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -91,10 +92,9 @@ export function MaintenanceReport({ taskId, onBack, restoreFromDraft }: Maintena
     if (draft) {
       setSummaryDraft(draft.data.reportSummary);
       setNotesDraft(draft.data.maintenanceNotes);
-      setSummary(draft.data.reportSummary);
-      setMaintenanceNotes(draft.data.maintenanceNotes);
-      maintenanceService.updateReportSummary(taskId, draft.data.reportSummary);
-      maintenanceService.updateMaintenanceNotes(taskId, draft.data.maintenanceNotes);
+      setIsEditingSummary(true);
+      setIsEditingNotes(true);
+      setIsDraftMode(true);
       setLastSaved(new Date(draft.updatedAt).toLocaleTimeString('zh-CN'));
     }
     setShowDraftRestore(false);
@@ -103,6 +103,27 @@ export function MaintenanceReport({ taskId, onBack, restoreFromDraft }: Maintena
   const clearDraft = () => {
     draftService.deleteMaintenanceReportDraft(taskId);
     setLastSaved('');
+    setIsDraftMode(false);
+  };
+
+  const getDraftChanged = () => {
+    if (!task) return { summaryChanged: false, notesChanged: false };
+    const originalTask = maintenanceService.getById(taskId);
+    if (!originalTask) return { summaryChanged: false, notesChanged: false };
+    return {
+      summaryChanged: summaryDraft !== (originalTask.reportSummary || ''),
+      notesChanged: notesDraft !== (originalTask.maintenanceNotes || ''),
+    };
+  };
+
+  const discardDraftChanges = () => {
+    if (task) {
+      setSummaryDraft(task.reportSummary || '');
+      setNotesDraft(task.maintenanceNotes || '');
+    }
+    setIsEditingSummary(false);
+    setIsEditingNotes(false);
+    clearDraft();
   };
 
   const isPipeCompleted = (pipe: PipeRecord): boolean => {
@@ -207,6 +228,9 @@ export function MaintenanceReport({ taskId, onBack, restoreFromDraft }: Maintena
     );
   }
 
+  const { summaryChanged, notesChanged } = getDraftChanged();
+  const hasDraftChanges = summaryChanged || notesChanged;
+
   return (
     <main className="app report-page">
       <section className="hero venue-hero report-hero">
@@ -223,7 +247,53 @@ export function MaintenanceReport({ taskId, onBack, restoreFromDraft }: Maintena
             {VENUE_TYPE_LABELS[venue.type]} · {venue.address}
           </span>
         )}
-        {lastSaved && (
+        {isDraftMode && (
+          <div
+            style={{
+              marginTop: '12px',
+              padding: '10px 14px',
+              background: '#fef3c7',
+              border: '1px solid #f59e0b',
+              borderRadius: '8px',
+              fontSize: '14px',
+              color: '#92400e',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span>
+              ⚠️ <strong>草稿模式</strong>
+              {hasDraftChanges
+                ? `· ${summaryChanged ? '摘要' : ''}${summaryChanged && notesChanged ? '、' : ''}${notesChanged ? '备注' : ''} 待保存`
+                : '· 当前无修改'}
+              {lastSaved && ` · 草稿已自动保存于 ${lastSaved}`}
+            </span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => {
+                  if (window.confirm('确定要放弃所有草稿修改并恢复到正式记录吗？')) {
+                    discardDraftChanges();
+                  }
+                }}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  border: '1px solid #92400e',
+                  background: '#fff',
+                  color: '#92400e',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                }}
+              >
+                放弃草稿
+              </button>
+            </div>
+          </div>
+        )}
+        {!isDraftMode && lastSaved && (
           <p style={{ marginTop: '8px', color: '#64748b', fontSize: '13px' }}>
             💾 草稿已自动保存于 {lastSaved}
           </p>
@@ -655,11 +725,11 @@ export function MaintenanceReport({ taskId, onBack, restoreFromDraft }: Maintena
                 检测到上次未完成的报告草稿，是否恢复？
               </p>
               <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-                ⚠️ 恢复草稿将覆盖当前已保存的报告内容
+                💡 恢复后将自动打开编辑区，内容只会保存在本地草稿中，点击「保存」才会写入正式记录
               </p>
             </div>
             <div className="modal-footer">
-              <button onClick={() => setShowDraftRestore(false)}>
+              <button onClick={clearDraft}>
                 放弃草稿
               </button>
               <button className="primary" onClick={restoreDraft}>

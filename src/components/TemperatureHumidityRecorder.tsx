@@ -5,6 +5,8 @@ import { maintenanceService } from '../services/maintenanceService';
 interface TemperatureHumidityRecorderProps {
   taskId: string;
   onRecordAdded?: () => void;
+  onAddRecord?: (data: { temperature: number; humidity: number; note?: string }) => TemperatureHumidityRecord | undefined;
+  onDeleteRecord?: (recordId: string) => boolean;
 }
 
 interface FormData {
@@ -19,7 +21,7 @@ const DEFAULT_FORM_DATA: FormData = {
   note: '',
 };
 
-export function TemperatureHumidityRecorder({ taskId, onRecordAdded }: TemperatureHumidityRecorderProps) {
+export function TemperatureHumidityRecorder({ taskId, onRecordAdded, onAddRecord, onDeleteRecord }: TemperatureHumidityRecorderProps) {
   const [records, setRecords] = useState<TemperatureHumidityRecord[]>([]);
   const [formData, setFormData] = useState<FormData>(DEFAULT_FORM_DATA);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -100,11 +102,17 @@ export function TemperatureHumidityRecorder({ taskId, onRecordAdded }: Temperatu
     e.preventDefault();
     if (!validateForm()) return;
 
-    maintenanceService.addTemperatureHumidityRecord(taskId, {
+    const recordData = {
       temperature: parseFloat(formData.temperature),
       humidity: parseFloat(formData.humidity),
       note: formData.note || undefined,
-    });
+    };
+
+    if (onAddRecord) {
+      onAddRecord(recordData);
+    } else {
+      maintenanceService.addTemperatureHumidityRecord(taskId, recordData);
+    }
 
     loadRecords();
     setFormData(DEFAULT_FORM_DATA);
@@ -113,11 +121,15 @@ export function TemperatureHumidityRecorder({ taskId, onRecordAdded }: Temperatu
   };
 
   const handleDeleteRecord = (recordId: string) => {
-    if (window.confirm('确定要删除这条温湿度记录吗？')) {
+    if (!window.confirm('确定要删除这条温湿度记录吗？')) return;
+
+    if (onDeleteRecord) {
+      onDeleteRecord(recordId);
+    } else {
       maintenanceService.deleteTemperatureHumidityRecord(taskId, recordId);
-      loadRecords();
-      onRecordAdded?.();
     }
+    loadRecords();
+    onRecordAdded?.();
   };
 
   const formatDateTime = (isoString: string): string => {
