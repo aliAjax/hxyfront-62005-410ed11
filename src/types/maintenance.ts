@@ -17,8 +17,20 @@ export interface PipeRecord {
   humidity?: number;
   reedStatus?: string;
   remarks?: string;
+  reinspected?: boolean;
+  reinspectedAt?: string;
+  reinspectionNote?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type AbnormalReason = 'deviation' | 'reed_adjust' | 'recheck_mark';
+
+export interface AbnormalPipeInfo {
+  taskId: string;
+  task: MaintenanceTask;
+  pipe: PipeRecord;
+  reasons: AbnormalReason[];
 }
 
 export interface MaintenanceTask {

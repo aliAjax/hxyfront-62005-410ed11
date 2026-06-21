@@ -1,4 +1,4 @@
-import type { MaintenanceTask, MaintenanceTaskFormData, PipeRecord, TemperatureHumidityRecord } from '../types/maintenance';
+import type { MaintenanceTask, MaintenanceTaskFormData, PipeRecord, TemperatureHumidityRecord, AbnormalPipeInfo, AbnormalReason } from '../types/maintenance';
 import { venueService } from './venueService';
 
 const STORAGE_KEY = 'organ_tuning_maintenance_tasks';
@@ -168,6 +168,108 @@ export const maintenanceService = {
       minHumidity: Math.min(...humidities),
       latest,
       count: records.length,
+    };
+  },
+
+  DEVIATION_THRESHOLD: 5,
+
+  getAbnormalReasons(pipe: PipeRecord): AbnormalReason[] {
+    const reasons: AbnormalReason[] = [];
+    if (pipe.centDeviation !== undefined && Math.abs(pipe.centDeviation) > this.DEVIATION_THRESHOLD) {
+      reasons.push('deviation');
+    }
+    if (pipe.reedStatus === '需微调') {
+      reasons.push('reed_adjust');
+    }
+    if (pipe.remarks && (pipe.remarks.includes('复检') || pipe.remarks.includes('标记复检') || pipe.remarks.includes('需复检'))) {
+      reasons.push('recheck_mark');
+    }
+    return reasons;
+  },
+
+  isPipeAbnormal(pipe: PipeRecord): boolean {
+    return this.getAbnormalReasons(pipe).length > 0;
+  },
+
+  getAbnormalPipes(options?: {
+    includeReinspected?: boolean;
+    venueId?: string;
+    stopCategory?: string;
+    reason?: AbnormalReason;
+  }): AbnormalPipeInfo[] {
+    const { includeReinspected = false, venueId, stopCategory, reason } = options || {};
+    const tasks = this.getAll();
+    const abnormalPipes: AbnormalPipeInfo[] = [];
+
+    for (const task of tasks) {
+      if (venueId && task.venueId !== venueId) continue;
+
+      for (const pipe of task.pipeRecords) {
+        if (!includeReinspected && pipe.reinspected) continue;
+
+        const reasons = this.getAbnormalReasons(pipe);
+        if (reasons.length === 0) continue;
+        if (reason && !reasons.includes(reason)) continue;
+
+        abnormalPipes.push({
+          taskId: task.id,
+          task,
+          pipe,
+          reasons,
+        });
+      }
+    }
+
+    return abnormalPipes.sort((a, b) => {
+      if (a.pipe.reinspected && !b.pipe.reinspected) return 1;
+      if (!a.pipe.reinspected && b.pipe.reinspected) return -1;
+      return new Date(b.pipe.updatedAt).getTime() - new Date(a.pipe.updatedAt).getTime();
+    });
+  },
+
+  markAsReinspected(taskId: string, pipeRecordId: string, note?: string): PipeRecord | undefined {
+    return this.updatePipeRecord(taskId, pipeRecordId, {
+      reinspected: true,
+      reinspectedAt: new Date().toISOString(),
+      reinspectionNote: note || undefined,
+    });
+  },
+
+  undoReinspected(taskId: string, pipeRecordId: string): PipeRecord | undefined {
+    return this.updatePipeRecord(taskId, pipeRecordId, {
+      reinspected: false,
+      reinspectedAt: undefined,
+      reinspectionNote: undefined,
+    });
+  },
+
+  getAbnormalPipesStats(): {
+    total: number;
+    pending: number;
+    completed: number;
+    byReason: Record<AbnormalReason, number>;
+  } {
+    const allAbnormal = this.getAbnormalPipes({ includeReinspected: true });
+    const pending = allAbnormal.filter((p) => !p.pipe.reinspected);
+    const completed = allAbnormal.filter((p) => p.pipe.reinspected);
+
+    const byReason: Record<AbnormalReason, number> = {
+      deviation: 0,
+      reed_adjust: 0,
+      recheck_mark: 0,
+    };
+
+    for (const info of pending) {
+      for (const reason of info.reasons) {
+        byReason[reason]++;
+      }
+    }
+
+    return {
+      total: allAbnormal.length,
+      pending: pending.length,
+      completed: completed.length,
+      byReason,
     };
   },
 };

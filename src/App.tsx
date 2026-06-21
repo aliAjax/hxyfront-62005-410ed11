@@ -6,13 +6,14 @@ import { MaintenanceTaskCreate } from './components/MaintenanceTaskCreate';
 import { TuningRecordView } from './components/TuningRecordView';
 import { TuningDeviationEntry } from './components/TuningDeviationEntry';
 import { MaintenanceReport } from './components/MaintenanceReport';
+import { ReinspectionDashboard } from './components/ReinspectionDashboard';
 import { venueService } from './services/venueService';
 import { stopService } from './services/stopService';
 import type { Venue } from './types/venue';
 import type { StopCategory } from './types/stops';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from './types/stops';
 
-type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation' | 'maintenance-report';
+type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation' | 'maintenance-report' | 'reinspection';
 
 const project = {
   "sourceNo": 7,
@@ -199,6 +200,14 @@ function App() {
     );
   }
 
+  if (currentPage === 'reinspection') {
+    return (
+      <ReinspectionDashboard
+        onBack={() => setCurrentPage('workspace')}
+      />
+    );
+  }
+
   return (
     <main className="app">
       <section className="hero">
@@ -262,6 +271,9 @@ function App() {
             </button>
             <button className="primary full-width" style={{ marginTop: '10px', background: STOP_CATEGORY_COLORS.principal, borderColor: STOP_CATEGORY_COLORS.principal }} onClick={() => setCurrentPage('stops')}>
               🎵 音栓资料库
+            </button>
+            <button className="primary full-width" style={{ marginTop: '10px', background: '#f59e0b', borderColor: '#f59e0b' }} onClick={() => setCurrentPage('reinspection')}>
+              🔍 异常音管复检看板
             </button>
           </div>
 
