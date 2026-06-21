@@ -1,4 +1,10 @@
+import { useState, useEffect } from 'react';
 import "./styles.css";
+import { VenueManagement } from './components/VenueManagement';
+import { venueService } from './services/venueService';
+import type { Venue } from './types/venue';
+
+type Page = 'workspace' | 'venues';
 
 const project = {
   "sourceNo": 7,
@@ -26,6 +32,8 @@ const project = {
   ],
   "fields": [
     "场馆名称",
+    "温度",
+    "湿度",
     "音栓",
     "音管编号",
     "音高",
@@ -55,6 +63,45 @@ const project = {
 };
 
 function App() {
+  const [currentPage, setCurrentPage] = useState<Page>('workspace');
+  const [venues, setVenues] = useState<{ id: string; name: string }[]>([]);
+  const [selectedVenueId, setSelectedVenueId] = useState<string>('');
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    loadVenues();
+  }, [currentPage]);
+
+  const loadVenues = () => {
+    setVenues(venueService.getVenueNames());
+  };
+
+  const handleVenueSelect = (venueId: string) => {
+    setSelectedVenueId(venueId);
+    if (venueId) {
+      const venue = venueService.getById(venueId);
+      if (venue) {
+        setFormValues((prev) => ({
+          ...prev,
+          '场馆名称': venue.name,
+          '温度': venue.defaultTemperature.toString(),
+          '湿度': venue.defaultHumidity.toString(),
+        }));
+      }
+    }
+  };
+
+  const handleFieldChange = (field: string, value: string) => {
+    setFormValues((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  if (currentPage === 'venues') {
+    return <VenueManagement onBack={() => setCurrentPage('workspace')} />;
+  }
+
   return (
     <main className="app">
       <section className="hero">
@@ -80,6 +127,13 @@ function App() {
               <button key={item}>{item}</button>
             ))}
           </div>
+
+          <h2 style={{ marginTop: '24px' }}>快速入口</h2>
+          <div className="quick-actions">
+            <button className="primary full-width" onClick={() => setCurrentPage('venues')}>
+              🏛️ 场馆档案管理
+            </button>
+          </div>
         </aside>
 
         <section className="panel form-panel">
@@ -91,10 +145,28 @@ function App() {
             <button className="primary">保存草稿</button>
           </div>
           <div className="field-grid">
+            <label className="full-width">
+              <span>选择场馆</span>
+              <select
+                value={selectedVenueId}
+                onChange={(e) => handleVenueSelect(e.target.value)}
+              >
+                <option value="">-- 请选择已有场馆（自动回填信息）--</option>
+                {venues.map((venue) => (
+                  <option key={venue.id} value={venue.id}>
+                    {venue.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             {project.fields.map((field: string) => (
               <label key={field}>
                 <span>{field}</span>
-                <input placeholder={"填写" + field} />
+                <input
+                  placeholder={"填写" + field}
+                  value={formValues[field] || ''}
+                  onChange={(e) => handleFieldChange(field, e.target.value)}
+                />
               </label>
             ))}
           </div>
