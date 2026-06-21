@@ -32,7 +32,7 @@ const DEFAULT_PIPE_FORM_DATA: PipeFormData = {
   remarks: '',
 };
 
-export function TuningRecordView({ taskId, onBack }: TuningRecordViewProps) {
+export function TuningRecordView({ taskId, onBack, onViewReport }: TuningRecordViewProps) {
   const [task, setTask] = useState<MaintenanceTask | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
   const [editingPipe, setEditingPipe] = useState<PipeRecord | null>(null);
@@ -332,13 +332,24 @@ export function TuningRecordView({ taskId, onBack }: TuningRecordViewProps) {
             <p>维护报告</p>
             <h2>任务摘要</h2>
           </div>
-          <button
-            className="primary"
-            onClick={() => window.print()}
-            style={{ background: 'var(--primary)', borderColor: 'var(--primary)' }}
-          >
-            📄 打印报告
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {onViewReport && (
+              <button
+                className="primary"
+                onClick={onViewReport}
+                style={{ background: 'var(--accent)', borderColor: 'var(--accent)' }}
+              >
+                📑 查看完整报告
+              </button>
+            )}
+            <button
+              className="primary"
+              onClick={() => window.print()}
+              style={{ background: 'var(--primary)', borderColor: 'var(--primary)' }}
+            >
+              📄 打印报告
+            </button>
+          </div>
         </div>
         <div className="report-summary-grid">
           <div className="report-summary-item">

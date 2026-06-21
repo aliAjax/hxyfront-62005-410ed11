@@ -5,13 +5,14 @@ import { StopManagement } from './components/StopManagement';
 import { MaintenanceTaskCreate } from './components/MaintenanceTaskCreate';
 import { TuningRecordView } from './components/TuningRecordView';
 import { TuningDeviationEntry } from './components/TuningDeviationEntry';
+import { MaintenanceReport } from './components/MaintenanceReport';
 import { venueService } from './services/venueService';
 import { stopService } from './services/stopService';
 import type { Venue } from './types/venue';
 import type { StopCategory } from './types/stops';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from './types/stops';
 
-type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation';
+type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation' | 'maintenance-report';
 
 const project = {
   "sourceNo": 7,
@@ -176,6 +177,7 @@ function App() {
       <TuningRecordView
         taskId={currentTaskId}
         onBack={() => setCurrentPage('workspace')}
+        onViewReport={() => setCurrentPage('maintenance-report')}
       />
     );
   }
@@ -184,6 +186,15 @@ function App() {
     return (
       <TuningDeviationEntry
         onBack={() => setCurrentPage('workspace')}
+      />
+    );
+  }
+
+  if (currentPage === 'maintenance-report' && currentTaskId) {
+    return (
+      <MaintenanceReport
+        taskId={currentTaskId}
+        onBack={() => setCurrentPage('tuning-record')}
       />
     );
   }
