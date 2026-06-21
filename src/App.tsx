@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import "./styles.css";
 import { VenueManagement } from './components/VenueManagement';
+import { StopManagement } from './components/StopManagement';
 import { venueService } from './services/venueService';
+import { stopService } from './services/stopService';
 import type { Venue } from './types/venue';
+import type { StopCategory } from './types/stops';
+import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from './types/stops';
 
-type Page = 'workspace' | 'venues';
+type Page = 'workspace' | 'venues' | 'stops';
 
 const project = {
   "sourceNo": 7,
@@ -62,18 +66,33 @@ const project = {
   ]
 };
 
+const CATEGORY_FILTER_MAP: Record<string, StopCategory> = {
+  '主音栓': 'principal',
+  '簧片音栓': 'reed',
+  '混合音栓': 'mixture',
+  '低音管': 'bourdon',
+};
+
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('workspace');
   const [venues, setVenues] = useState<{ id: string; name: string }[]>([]);
+  const [stops, setStops] = useState<{ id: string; label: string; category: StopCategory }[]>([]);
   const [selectedVenueId, setSelectedVenueId] = useState<string>('');
+  const [selectedStopId, setSelectedStopId] = useState<string>('');
+  const [activeFilter, setActiveFilter] = useState<StopCategory | 'all'>('all');
   const [formValues, setFormValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadVenues();
+    loadStops();
   }, [currentPage]);
 
   const loadVenues = () => {
     setVenues(venueService.getVenueNames());
+  };
+
+  const loadStops = () => {
+    setStops(stopService.getAllDisplayLabels());
   };
 
   const handleVenueSelect = (venueId: string) => {
@@ -91,6 +110,24 @@ function App() {
     }
   };
 
+  const handleStopSelect = (stopId: string) => {
+    setSelectedStopId(stopId);
+    if (stopId) {
+      const stop = stops.find((s) => s.id === stopId);
+      if (stop) {
+        setFormValues((prev) => ({
+          ...prev,
+          '音栓': stop.label,
+        }));
+      }
+    } else {
+      setFormValues((prev) => ({
+        ...prev,
+        '音栓': '',
+      }));
+    }
+  };
+
   const handleFieldChange = (field: string, value: string) => {
     setFormValues((prev) => ({
       ...prev,
@@ -98,8 +135,24 @@ function App() {
     }));
   };
 
+  const handleFilterClick = (filterName: string) => {
+    const category = CATEGORY_FILTER_MAP[filterName];
+    if (category) {
+      setActiveFilter((prev) => (prev === category ? 'all' : category));
+    }
+  };
+
+  const getFilteredStops = () => {
+    if (activeFilter === 'all') return stops;
+    return stops.filter((s) => s.category === activeFilter);
+  };
+
   if (currentPage === 'venues') {
     return <VenueManagement onBack={() => setCurrentPage('workspace')} />;
+  }
+
+  if (currentPage === 'stops') {
+    return <StopManagement onBack={() => setCurrentPage('workspace')} />;
   }
 
   return (
@@ -123,17 +176,83 @@ function App() {
         <aside className="panel">
           <h2>{project.domain}筛选</h2>
           <div className="chips">
-            {project.filters.map((item: string) => (
-              <button key={item}>{item}</button>
-            ))}
+            {project.filters.map((item: string) => {
+              const category = CATEGORY_FILTER_MAP[item];
+              const isActive = activeFilter === category;
+              return (
+                <button
+                  key={item}
+                  className={isActive ? 'active' : ''}
+                  style={
+                    isActive
+                      ? {
+                          background: STOP_CATEGORY_COLORS[category],
+                          color: '#fff',
+                          borderColor: STOP_CATEGORY_COLORS[category],
+                        }
+                      : undefined
+                  }
+                  onClick={() => handleFilterClick(item)}
+                >
+                  {item}
+                </button>
+              );
+            })}
           </div>
+          {activeFilter !== 'all' && (
+            <button className="clear-filter-btn" onClick={() => setActiveFilter('all')}>
+              ✕ 清除筛选
+            </button>
+          )}
 
           <h2 style={{ marginTop: '24px' }}>快速入口</h2>
           <div className="quick-actions">
             <button className="primary full-width" onClick={() => setCurrentPage('venues')}>
               🏛️ 场馆档案管理
             </button>
+            <button className="primary full-width" style={{ marginTop: '10px', background: STOP_CATEGORY_COLORS.principal, borderColor: STOP_CATEGORY_COLORS.principal }} onClick={() => setCurrentPage('stops')}>
+              🎵 音栓资料库
+            </button>
           </div>
+
+          {stops.length > 0 && (
+            <div style={{ marginTop: '24px' }}>
+              <h2>可用音栓 ({getFilteredStops().length})</h2>
+              <div className="stop-reference-list">
+                {getFilteredStops().length === 0 ? (
+                  <p style={{ color: '#64748b', fontSize: '13px', padding: '8px 0' }}>当前分类下暂无音栓</p>
+                ) : (
+                  getFilteredStops().map((stop) => (
+                    <div
+                      key={stop.id}
+                      className={`stop-reference-item ${selectedStopId === stop.id ? 'selected' : ''}`}
+                      onClick={() => handleStopSelect(selectedStopId === stop.id ? '' : stop.id)}
+                      style={
+                        selectedStopId === stop.id
+                          ? {
+                              borderColor: STOP_CATEGORY_COLORS[stop.category],
+                              background: `color-mix(in srgb, ${STOP_CATEGORY_COLORS[stop.category]} 10%, #ffffff)`,
+                            }
+                          : undefined
+                      }
+                    >
+                      <span
+                        className="stop-dot"
+                        style={{ background: STOP_CATEGORY_COLORS[stop.category] }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <span className="stop-ref-name">{stop.label}</span>
+                        <span className="stop-ref-category">
+                          {STOP_CATEGORY_LABELS[stop.category]}
+                        </span>
+                      </div>
+                      {selectedStopId === stop.id && <span className="stop-check">✓</span>}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </aside>
 
         <section className="panel form-panel">
@@ -159,16 +278,61 @@ function App() {
                 ))}
               </select>
             </label>
-            {project.fields.map((field: string) => (
-              <label key={field}>
-                <span>{field}</span>
-                <input
-                  placeholder={"填写" + field}
-                  value={formValues[field] || ''}
-                  onChange={(e) => handleFieldChange(field, e.target.value)}
-                />
-              </label>
-            ))}
+            <label className="full-width">
+              <span>选择音栓（从资料库中选择）</span>
+              <div className="stop-selector-wrapper">
+                <select
+                  value={selectedStopId}
+                  onChange={(e) => handleStopSelect(e.target.value)}
+                >
+                  <option value="">-- 从资料库选择音栓（自动回填名称+英尺）--</option>
+                  {stops.map((stop) => (
+                    <option key={stop.id} value={stop.id}>
+                      [{STOP_CATEGORY_LABELS[stop.category]}] {stop.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => setCurrentPage('stops')}
+                >
+                  管理音栓 →
+                </button>
+              </div>
+            </label>
+            {project.fields.map((field: string) => {
+              if (field === '音栓') {
+                return (
+                  <label key={field} className="full-width">
+                    <span>{field}（可直接编辑）</span>
+                    <input
+                      placeholder={"填写" + field}
+                      value={formValues[field] || ''}
+                      onChange={(e) => {
+                        handleFieldChange(field, e.target.value);
+                        if (selectedStopId) {
+                          const stop = stops.find((s) => s.id === selectedStopId);
+                          if (stop && stop.label !== e.target.value) {
+                            setSelectedStopId('');
+                          }
+                        }
+                      }}
+                    />
+                  </label>
+                );
+              }
+              return (
+                <label key={field}>
+                  <span>{field}</span>
+                  <input
+                    placeholder={"填写" + field}
+                    value={formValues[field] || ''}
+                    onChange={(e) => handleFieldChange(field, e.target.value)}
+                  />
+                </label>
+              );
+            })}
           </div>
         </section>
       </section>
