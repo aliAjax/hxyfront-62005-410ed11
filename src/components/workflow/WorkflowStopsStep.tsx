@@ -9,6 +9,7 @@ export function WorkflowStopsStep() {
     useWorkflow();
   const [stops, setStops] = useState<Stop[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<StopCategory | 'all'>('all');
+  const [searchKeyword, setSearchKeyword] = useState('');
   const [bulkAssignStopId, setBulkAssignStopId] = useState('');
   const [editingPipeNumber, setEditingPipeNumber] = useState<string | null>(null);
 
@@ -17,9 +18,24 @@ export function WorkflowStopsStep() {
   }, []);
 
   const filteredStops = useMemo(() => {
-    if (selectedCategory === 'all') return stops;
-    return stops.filter((s) => s.category === selectedCategory);
-  }, [stops, selectedCategory]);
+    let result = stops;
+    if (selectedCategory !== 'all') {
+      result = result.filter((s) => s.category === selectedCategory);
+    }
+    if (searchKeyword.trim()) {
+      const kw = searchKeyword.trim().toLowerCase();
+      result = result.filter((s) => {
+        const categoryLabel = STOP_CATEGORY_LABELS[s.category].toLowerCase();
+        return (
+          s.name.toLowerCase().includes(kw) ||
+          s.footMark.toLowerCase().includes(kw) ||
+          s.remarks.toLowerCase().includes(kw) ||
+          categoryLabel.includes(kw)
+        );
+      });
+    }
+    return result;
+  }, [stops, selectedCategory, searchKeyword]);
 
   const assignedCount = useMemo(() => {
     return state.pipeNumbers.filter(
@@ -93,6 +109,27 @@ export function WorkflowStopsStep() {
             </select>
           </label>
           <label className="filter-item">
+            <span>搜索音栓名称/关键词</span>
+            <div className="workflow-search-box">
+              <input
+                type="text"
+                placeholder="输入Trumpet、Principal或中文分类…"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                className="workflow-search-input"
+              />
+              {searchKeyword && (
+                <button
+                  className="workflow-search-clear"
+                  onClick={() => setSearchKeyword('')}
+                  type="button"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </label>
+          <label className="filter-item">
             <span>批量分配音栓到所有音管</span>
             <div style={{ display: 'flex', gap: '8px' }}>
               <select
@@ -101,7 +138,7 @@ export function WorkflowStopsStep() {
                 style={{ flex: 1 }}
               >
                 <option value="">-- 选择音栓 --</option>
-                {stops.map((s) => (
+                {filteredStops.map((s) => (
                   <option key={s.id} value={s.id}>
                     [{STOP_CATEGORY_LABELS[s.category]}] {stopService.getDisplayLabel(s)}
                   </option>
@@ -124,7 +161,7 @@ export function WorkflowStopsStep() {
           <div className="stop-reference-list">
             {filteredStops.length === 0 ? (
               <p style={{ color: '#64748b', fontSize: '13px', padding: '8px 0' }}>
-                当前分类下暂无音栓
+                {searchKeyword.trim() ? '未找到匹配的音栓，试试其他关键词' : '当前分类下暂无音栓'}
               </p>
             ) : (
               filteredStops.map((stop) => (
@@ -219,7 +256,7 @@ export function WorkflowStopsStep() {
                       autoFocus
                     >
                       <option value="">-- 未分配 --</option>
-                      {stops.map((s) => (
+                      {filteredStops.map((s) => (
                         <option key={s.id} value={s.id}>
                           [{STOP_CATEGORY_LABELS[s.category]}] {stopService.getDisplayLabel(s)}
                         </option>

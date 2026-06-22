@@ -2044,6 +2044,52 @@ textarea {
   border-color: var(--accent);
 }
 
+.workflow-search-box {
+  position: relative;
+  width: 100%;
+}
+
+.workflow-search-input {
+  width: 100%;
+  padding: 10px 32px 10px 12px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: #ffffff;
+  transition: border-color 0.2s ease;
+}
+
+.workflow-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.workflow-search-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.workflow-search-clear:hover {
+  color: #475569;
+  background: #f1f5f9;
+}
+
 .filter-item.checkbox-item {
   flex-direction: row;
   align-items: center;
