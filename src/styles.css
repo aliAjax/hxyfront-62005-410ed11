@@ -3273,3 +3273,370 @@ textarea {
     break-inside: avoid;
   }
 }
+
+.history-hero {
+  border-left-color: #059669;
+}
+
+.history-filter-panel {
+  margin-bottom: 18px;
+}
+
+.history-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.history-filter-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-filter-grid label span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.history-filter-grid select,
+.history-filter-grid input {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #1f2937;
+  min-height: 38px;
+}
+
+.history-trend-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.trend-stat-card {
+  padding: 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-left: 4px solid;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.trend-stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.trend-stat-label {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+  flex: 1;
+}
+
+.trend-stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.trend-stat-unit {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+  margin-left: 2px;
+  align-self: flex-end;
+  margin-bottom: 4px;
+}
+
+.history-summary-panel {
+  margin-bottom: 18px;
+}
+
+.history-summary-content {
+  padding: 16px 20px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-top: 12px;
+  line-height: 1.8;
+}
+
+.history-summary-content p {
+  margin: 6px 0;
+  font-size: 14px;
+  color: #374151;
+}
+
+.history-results-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.history-pipe-card {
+  padding: 18px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.history-pipe-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.history-pipe-card.expanded {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.history-pipe-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.history-pipe-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.history-pipe-number {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.trend-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.history-pipe-deviations {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.deviation-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.deviation-label {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.deviation-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.history-expand-icon {
+  font-size: 12px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  padding: 4px 8px;
+}
+
+.history-pipe-detail {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.history-timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.history-timeline-header h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #1f2937;
+}
+
+.history-count {
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 2px 10px;
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.history-timeline-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-timeline-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 110px 100px auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.history-timeline-row:last-child {
+  border-bottom: none;
+}
+
+.timeline-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.timeline-bar-container {
+  position: relative;
+  height: 24px;
+  background: #f8fafc;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.timeline-bar-zero {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #cbd5e1;
+  z-index: 1;
+}
+
+.timeline-bar {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  min-width: 3px;
+}
+
+.timeline-bar.positive {
+  background: #fca5a5;
+  right: auto;
+}
+
+.timeline-bar.negative {
+  background: #93c5fd;
+  left: auto;
+  transform: translateX(-100%);
+}
+
+.timeline-bar.exceed.positive {
+  background: #dc2626;
+}
+
+.timeline-bar.exceed.negative {
+  background: #2563eb;
+}
+
+.timeline-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.timeline-value.exceed {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.timeline-env {
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.timeline-remark {
+  font-size: 12px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-comparison-section {
+  margin-top: 24px;
+  padding: 20px;
+  background: #f0fdf4;
+  border-radius: 8px;
+  border: 1px solid #bbf7d0;
+}
+
+.history-comparison-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: #166534;
+}
+
+.history-comparison-conclusion {
+  line-height: 1.8;
+  color: #374151;
+  font-size: 14px;
+}
+
+.history-comparison-conclusion p {
+  margin: 6px 0;
+}
+
+@media (max-width: 768px) {
+  .history-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-pipe-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .history-pipe-deviations {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .history-timeline-row {
+    grid-template-columns: 90px 1fr 100px;
+    gap: 8px;
+  }
+
+  .timeline-env,
+  .timeline-remark {
+    grid-column: 1 / -1;
+  }
+}

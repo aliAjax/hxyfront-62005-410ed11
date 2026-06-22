@@ -8,6 +8,9 @@ import type { Stop } from '../types/stops';
 import type { Venue } from '../types/venue';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from '../types/stops';
 import { VENUE_TYPE_LABELS } from '../types/venue';
+import { historyComparisonService } from '../services/historyComparisonService';
+import { PIPE_TREND_LABELS, PIPE_TREND_COLORS, PIPE_TREND_BACKGROUNDS } from '../types/historyComparison';
+import type { PipeComparisonResult, PipeTrendType } from '../types/historyComparison';
 
 interface MaintenanceReportProps {
   taskId: string;
@@ -147,6 +150,23 @@ export function MaintenanceReport({ taskId, onBack, restoreFromDraft }: Maintena
     if (!task) return [];
     return task.pipeRecords.filter((p) => maintenanceService.isPipeAbnormal(p));
   }, [task]);
+
+  const historyComparison = useMemo((): {
+    results: PipeComparisonResult[];
+    summary: string;
+  } => {
+    if (!task) return { results: [], summary: '' };
+    const results = historyComparisonService.getComparisonForTask(taskId);
+    const currentTaskPipeNumbers = new Set(task.pipeRecords.map((p) => p.pipeNumber));
+    const relevantResults = results.filter((r) => currentTaskPipeNumbers.has(r.pipeNumber));
+    const problematicResults = relevantResults.filter(
+      (r) => r.trend === 'persistently_high' || r.trend === 'persistently_low' || r.trend === 'sudden_exceed'
+    );
+    const summaryText = problematicResults.length > 0
+      ? historyComparisonService.getComparisonSummary(problematicResults)
+      : '';
+    return { results: relevantResults, summary: summaryText };
+  }, [taskId, task]);
 
   const totalCount = task ? task.pipeRecords.length : 0;
 
@@ -587,6 +607,100 @@ export function MaintenanceReport({ taskId, onBack, restoreFromDraft }: Maintena
           </div>
         )}
       </section>
+
+      {historyComparison.results.length > 0 && (
+        <section className="panel">
+          <div className="heading">
+            <div>
+              <p>历史对比</p>
+              <h2>音管历史维护对比分析</h2>
+              <p style={{ marginTop: '4px', color: '#64748b', fontSize: '13px' }}>
+                基于该场馆 {historyComparison.results.length} 支音管的历史维护数据
+              </p>
+            </div>
+          </div>
+
+          {historyComparison.summary && (
+            <div className="history-comparison-section">
+              <h3>📊 对比结论</h3>
+              <div className="history-comparison-conclusion">
+                {historyComparison.summary.split('\n').map((line, i) => (
+                  <p key={i}>{line}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="report-pipe-table" style={{ marginTop: '16px' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>音管编号</th>
+                  <th>音栓</th>
+                  <th>趋势</th>
+                  <th>平均偏差</th>
+                  <th>本次偏差</th>
+                  <th>偏差变化</th>
+                  <th>超限次数</th>
+                  <th>历史记录数</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historyComparison.results
+                  .filter((r) => r.trend !== 'stable' && r.trend !== 'insufficient_data')
+                  .map((result) => (
+                    <tr key={result.pipeNumber} className={result.trend === 'sudden_exceed' ? 'abnormal-row' : ''}>
+                      <td><strong>{result.pipeNumber}</strong></td>
+                      <td>
+                        {result.stopId ? (
+                          <span
+                            className="stop-category"
+                            style={{
+                              background: `color-mix(in srgb, ${getStopColor(result.stopId)} 15%, #ffffff)`,
+                              color: getStopColor(result.stopId),
+                            }}
+                          >
+                            {getStopCategory(result.stopId)} · {getStopName(result.stopId)}
+                          </span>
+                        ) : (
+                          result.stopName || '--'
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          className="trend-badge"
+                          style={{
+                            background: PIPE_TREND_BACKGROUNDS[result.trend],
+                            color: PIPE_TREND_COLORS[result.trend],
+                          }}
+                        >
+                          {PIPE_TREND_LABELS[result.trend]}
+                        </span>
+                      </td>
+                      <td>
+                        {result.avgDeviation !== undefined
+                          ? `${result.avgDeviation > 0 ? '+' : ''}${result.avgDeviation.toFixed(1)} cent`
+                          : '--'}
+                      </td>
+                      <td style={{ color: result.latestDeviation !== undefined && Math.abs(result.latestDeviation) > 5 ? '#dc2626' : undefined, fontWeight: result.latestDeviation !== undefined && Math.abs(result.latestDeviation) > 5 ? 600 : undefined }}>
+                        {result.latestDeviation !== undefined
+                          ? `${result.latestDeviation > 0 ? '+' : ''}${result.latestDeviation.toFixed(1)} cent`
+                          : '--'}
+                      </td>
+                      <td style={{ color: result.deviationChange !== undefined && Math.abs(result.deviationChange) > 5 ? '#f59e0b' : '#059669' }}>
+                        {result.deviationChange !== undefined
+                          ? `${result.deviationChange > 0 ? '+' : ''}${result.deviationChange.toFixed(1)} cent`
+                          : '--'}
+                      </td>
+                      <td>{result.exceedCount}/{result.totalRecords}</td>
+                      <td>{result.totalRecords}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section className="panel report-pipes-panel">
         <div className="heading">

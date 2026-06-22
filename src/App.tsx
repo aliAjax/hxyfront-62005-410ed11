@@ -9,6 +9,7 @@ import { MaintenanceReport } from './components/MaintenanceReport';
 import { ReinspectionDashboard } from './components/ReinspectionDashboard';
 import { DraftList } from './components/DraftList';
 import { MaintenanceWorkflow } from './components/workflow/MaintenanceWorkflow';
+import { HistoryComparison } from './components/HistoryComparison';
 import { venueService } from './services/venueService';
 import { stopService } from './services/stopService';
 import { maintenanceService } from './services/maintenanceService';
@@ -18,7 +19,7 @@ import type { StopCategory } from './types/stops';
 import type { MaintenanceTask } from './types/maintenance';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from './types/stops';
 
-type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation' | 'maintenance-report' | 'reinspection' | 'report-selector' | 'drafts' | 'workflow';
+type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation' | 'maintenance-report' | 'reinspection' | 'report-selector' | 'drafts' | 'workflow' | 'history-comparison';
 
 const project = {
   "sourceNo": 7,
@@ -293,6 +294,14 @@ function App() {
     );
   }
 
+  if (currentPage === 'history-comparison') {
+    return (
+      <HistoryComparison
+        onBack={() => setCurrentPage('workspace')}
+      />
+    );
+  }
+
   if (currentPage === 'report-selector') {
     return (
       <main className="app">
@@ -491,6 +500,9 @@ function App() {
             </button>
             <button className="primary full-width" style={{ marginTop: '10px', background: '#7c3aed', borderColor: '#7c3aed' }} onClick={() => setCurrentPage('drafts')}>
               📝 本地草稿管理
+            </button>
+            <button className="primary full-width" style={{ marginTop: '10px', background: 'linear-gradient(135deg, #059669, #0ea5e9)', borderColor: 'transparent' }} onClick={() => setCurrentPage('history-comparison')}>
+              📊 历史维护对比
             </button>
           </div>
 
