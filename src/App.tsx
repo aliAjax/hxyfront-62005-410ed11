@@ -92,6 +92,7 @@ function App() {
   const [selectedVenueId, setSelectedVenueId] = useState<string>('');
   const [selectedStopId, setSelectedStopId] = useState<string>('');
   const [activeFilter, setActiveFilter] = useState<StopCategory | 'all'>('all');
+  const [stopSearchKeyword, setStopSearchKeyword] = useState('');
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [maintenanceTasks, setMaintenanceTasks] = useState<MaintenanceTask[]>([]);
   const [draftVenueEditingId, setDraftVenueEditingId] = useState<string | undefined>(undefined);
@@ -195,8 +196,34 @@ function App() {
   };
 
   const getFilteredStops = () => {
-    if (activeFilter === 'all') return stops;
-    return stops.filter((s) => s.category === activeFilter);
+    let result = stops;
+    if (activeFilter !== 'all') {
+      result = result.filter((s) => s.category === activeFilter);
+    }
+    if (stopSearchKeyword.trim()) {
+      const kw = stopSearchKeyword.trim().toLowerCase();
+      result = result.filter((s) => {
+        const categoryLabel = STOP_CATEGORY_LABELS[s.category].toLowerCase();
+        return s.label.toLowerCase().includes(kw) || categoryLabel.includes(kw);
+      });
+    }
+    return result;
+  };
+
+  const getFilteredMaintenanceTasks = () => {
+    let result = maintenanceTasks;
+    if (selectedStopId) {
+      result = result.filter((task) =>
+        task.pipeRecords.some((p) => p.stopId === selectedStopId)
+      );
+    }
+    return result;
+  };
+
+  const getSelectedStopLabel = () => {
+    if (!selectedStopId) return null;
+    const stop = stops.find((s) => s.id === selectedStopId);
+    return stop ? stop.label : null;
   };
 
   const handleContinueVenueDraft = (editingId?: string) => {
@@ -536,9 +563,31 @@ function App() {
           {stops.length > 0 && (
             <div style={{ marginTop: '24px' }}>
               <h2>可用音栓 ({getFilteredStops().length})</h2>
+              <div className="workspace-stop-search">
+                <div className="workflow-search-box" style={{ marginBottom: '12px' }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 搜索Trumpet、Principal或中文分类…"
+                    value={stopSearchKeyword}
+                    onChange={(e) => setStopSearchKeyword(e.target.value)}
+                    className="workflow-search-input"
+                  />
+                  {stopSearchKeyword && (
+                    <button
+                      className="workflow-search-clear"
+                      onClick={() => setStopSearchKeyword('')}
+                      type="button"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
               <div className="stop-reference-list">
                 {getFilteredStops().length === 0 ? (
-                  <p style={{ color: '#64748b', fontSize: '13px', padding: '8px 0' }}>当前分类下暂无音栓</p>
+                  <p style={{ color: '#64748b', fontSize: '13px', padding: '8px 0' }}>
+                    {stopSearchKeyword.trim() ? '未找到匹配的音栓' : '当前分类下暂无音栓'}
+                  </p>
                 ) : (
                   getFilteredStops().map((stop) => (
                     <div
@@ -604,7 +653,7 @@ function App() {
                   onChange={(e) => handleStopSelect(e.target.value)}
                 >
                   <option value="">-- 从资料库选择音栓（自动回填名称+英尺）--</option>
-                  {stops.map((stop) => (
+                  {getFilteredStops().map((stop) => (
                     <option key={stop.id} value={stop.id}>
                       [{STOP_CATEGORY_LABELS[stop.category]}] {stop.label}
                     </option>
@@ -662,9 +711,29 @@ function App() {
             <h2>近期工作台</h2>
             <p style={{ marginTop: '4px', color: '#64748b', fontSize: '13px' }}>
               共 {maintenanceTasks.length} 条维护记录
+              {selectedStopId && (
+                <span style={{ marginLeft: '8px', color: 'var(--accent)' }}>
+                  · 筛选：{getSelectedStopLabel()}
+                </span>
+              )}
             </p>
           </div>
-          <button>导出摘要</button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {selectedStopId && (
+              <button
+                type="button"
+                className="clear-filter-btn"
+                onClick={() => {
+                  setSelectedStopId('');
+                  setFormValues((prev) => ({ ...prev, '音栓': '' }));
+                }}
+                style={{ marginRight: '8px' }}
+              >
+                ✕ 清除音栓筛选
+              </button>
+            )}
+            <button>导出摘要</button>
+          </div>
         </div>
         <div className="sort-controls">
           <span className="sort-label">排序：</span>
@@ -696,19 +765,30 @@ function App() {
             )}
           </button>
         </div>
-        {maintenanceTasks.length === 0 ? (
+        {getFilteredMaintenanceTasks().length === 0 ? (
           <div className="empty-state">
-            <p>暂无维护记录</p>
+            <p>
+              {selectedStopId
+                ? `没有包含「${getSelectedStopLabel()}」的维护记录`
+                : '暂无维护记录'}
+            </p>
           </div>
         ) : (
           <div className="records">
-            {getSortedTasks(maintenanceTasks).map((task, index) => {
+            {getSortedTasks(getFilteredMaintenanceTasks()).map((task, index) => {
               const abnormalCount = task.pipeRecords.filter(
                 (p) => maintenanceService.isPipeAbnormal(p)
               ).length;
+              const selectedStopLabel = getSelectedStopLabel();
+              const matchingPipeCount = selectedStopId
+                ? task.pipeRecords.filter((p) => p.stopId === selectedStopId).length
+                : 0;
               const details = [
                 task.maintenanceDate,
                 `异常音管 ${abnormalCount} 支`,
+                selectedStopId && matchingPipeCount > 0
+                  ? `「${selectedStopLabel}」${matchingPipeCount} 支`
+                  : null,
                 task.participants ? `参与人员：${task.participants}` : null,
               ].filter(Boolean) as string[];
               return (
