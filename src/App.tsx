@@ -216,6 +216,11 @@ function App() {
       result = result.filter((task) =>
         task.pipeRecords.some((p) => p.stopId === selectedStopId)
       );
+    } else if (stopSearchKeyword.trim() || activeFilter !== 'all') {
+      const visibleStopIds = new Set(getFilteredStops().map((stop) => stop.id));
+      result = result.filter((task) =>
+        task.pipeRecords.some((p) => p.stopId && visibleStopIds.has(p.stopId))
+      );
     }
     return result;
   };
@@ -710,10 +715,15 @@ function App() {
             <p>历史记录</p>
             <h2>近期工作台</h2>
             <p style={{ marginTop: '4px', color: '#64748b', fontSize: '13px' }}>
-              共 {maintenanceTasks.length} 条维护记录
+              共 {getFilteredMaintenanceTasks().length} / {maintenanceTasks.length} 条维护记录
               {selectedStopId && (
                 <span style={{ marginLeft: '8px', color: 'var(--accent)' }}>
                   · 筛选：{getSelectedStopLabel()}
+                </span>
+              )}
+              {!selectedStopId && stopSearchKeyword.trim() && (
+                <span style={{ marginLeft: '8px', color: 'var(--accent)' }}>
+                  · 搜索：{stopSearchKeyword.trim()}
                 </span>
               )}
             </p>
@@ -770,6 +780,8 @@ function App() {
             <p>
               {selectedStopId
                 ? `没有包含「${getSelectedStopLabel()}」的维护记录`
+                : stopSearchKeyword.trim()
+                  ? `没有包含「${stopSearchKeyword.trim()}」匹配音栓的维护记录`
                 : '暂无维护记录'}
             </p>
           </div>
