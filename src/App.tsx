@@ -99,6 +99,33 @@ function App() {
   const [restoreTaskDraft, setRestoreTaskDraft] = useState(false);
   const [restoreTuningDraft, setRestoreTuningDraft] = useState(false);
   const [restoreReportDraft, setRestoreReportDraft] = useState(false);
+  const [sortField, setSortField] = useState<'date' | 'venue' | 'abnormal'>('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const getSortedTasks = (tasks: MaintenanceTask[]) => {
+    return [...tasks].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'date') {
+        cmp = new Date(a.maintenanceDate).getTime() - new Date(b.maintenanceDate).getTime();
+      } else if (sortField === 'venue') {
+        cmp = a.venueName.localeCompare(b.venueName, 'zh-CN');
+      } else if (sortField === 'abnormal') {
+        const aCount = a.pipeRecords.filter(p => maintenanceService.isPipeAbnormal(p)).length;
+        const bCount = b.pipeRecords.filter(p => maintenanceService.isPipeAbnormal(p)).length;
+        cmp = aCount - bCount;
+      }
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+  };
+
+  const handleSortChange = (field: 'date' | 'venue' | 'abnormal') => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection(field === 'venue' ? 'asc' : 'desc');
+    }
+  };
 
   useEffect(() => {
     loadVenues();
@@ -633,20 +660,108 @@ function App() {
           <div>
             <p>历史记录</p>
             <h2>近期工作台</h2>
+            <p style={{ marginTop: '4px', color: '#64748b', fontSize: '13px' }}>
+              共 {maintenanceTasks.length} 条维护记录
+            </p>
           </div>
           <button>导出摘要</button>
         </div>
-        <div className="records">
-          {project.records.map((record: string[], index: number) => (
-            <article key={record.join("-")}>
-              <b>{String(index + 1).padStart(2, "0")}</b>
-              <div>
-                <h3>{record[0]}</h3>
-                <p>{record.slice(1).join(" · ")}</p>
-              </div>
-            </article>
-          ))}
+        <div className="sort-controls">
+          <span className="sort-label">排序：</span>
+          <button
+            className={`sort-btn ${sortField === 'date' ? 'active' : ''}`}
+            onClick={() => handleSortChange('date')}
+          >
+            维护日期
+            {sortField === 'date' && (
+              <span className="sort-indicator">{sortDirection === 'asc' ? ' ↑' : ' ↓'}</span>
+            )}
+          </button>
+          <button
+            className={`sort-btn ${sortField === 'venue' ? 'active' : ''}`}
+            onClick={() => handleSortChange('venue')}
+          >
+            场馆名称
+            {sortField === 'venue' && (
+              <span className="sort-indicator">{sortDirection === 'asc' ? ' ↑' : ' ↓'}</span>
+            )}
+          </button>
+          <button
+            className={`sort-btn ${sortField === 'abnormal' ? 'active' : ''}`}
+            onClick={() => handleSortChange('abnormal')}
+          >
+            异常数量
+            {sortField === 'abnormal' && (
+              <span className="sort-indicator">{sortDirection === 'asc' ? ' ↑' : ' ↓'}</span>
+            )}
+          </button>
         </div>
+        {maintenanceTasks.length === 0 ? (
+          <div className="empty-state">
+            <p>暂无维护记录，请先创建维护任务</p>
+            <button
+              className="primary"
+              onClick={() => setCurrentPage('create-task')}
+              style={{ marginTop: '12px' }}
+            >
+              📋 创建维护任务
+            </button>
+          </div>
+        ) : (
+          <div className="records">
+            {getSortedTasks(maintenanceTasks).map((task, index) => {
+              const abnormalCount = task.pipeRecords.filter(
+                (p) => maintenanceService.isPipeAbnormal(p)
+              ).length;
+              const completedCount = task.pipeRecords.filter(
+                (p) => p.pitch || p.centDeviation !== undefined || p.remarks
+              ).length;
+              return (
+                <article key={task.id} className="record-card" onClick={() => {
+                  setCurrentTaskId(task.id);
+                  setCurrentPage('tuning-record');
+                }}>
+                  <b>{String(index + 1).padStart(2, '0')}</b>
+                  <div className="record-card-body">
+                    <div className="record-card-header">
+                      <h3>{task.venueName}</h3>
+                      <span className="record-date">{task.maintenanceDate}</span>
+                    </div>
+                    <div className="record-card-stats">
+                      <span className="record-stat">
+                        <span className="record-stat-label">音管</span>
+                        <span className="record-stat-value">{task.pipeRecords.length}</span>
+                      </span>
+                      <span className="record-stat">
+                        <span className="record-stat-label">已完成</span>
+                        <span className="record-stat-value" style={{ color: '#059669' }}>{completedCount}</span>
+                      </span>
+                      <span className="record-stat">
+                        <span className="record-stat-label">异常</span>
+                        <span className="record-stat-value" style={{ color: abnormalCount > 0 ? '#dc2626' : '#059669' }}>{abnormalCount}</span>
+                      </span>
+                      {task.participants && (
+                        <span className="record-stat">
+                          <span className="record-stat-label">人员</span>
+                          <span className="record-stat-value">{task.participants}</span>
+                        </span>
+                      )}
+                    </div>
+                    {(task.reportSummary || task.maintenanceNotes) && (
+                      <p className="record-card-summary">
+                        {task.reportSummary
+                          ? task.reportSummary.slice(0, 60) + (task.reportSummary.length > 60 ? '...' : '')
+                          : task.maintenanceNotes
+                            ? task.maintenanceNotes.slice(0, 60) + (task.maintenanceNotes.length > 60 ? '...' : '')
+                            : ''}
+                      </p>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
     </main>
   );

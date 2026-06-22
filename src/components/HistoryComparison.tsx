@@ -255,15 +255,15 @@ export function HistoryComparison({ onBack, onApplyToReport }: HistoryComparison
               <div className="history-results-list">
                 {filteredResults.map((result) => (
                   <div
-                    key={result.pipeNumber}
-                    className={`history-pipe-card ${expandedPipe === result.pipeNumber ? 'expanded' : ''}`}
+                    key={result.pipeKey}
+                    className={`history-pipe-card ${expandedPipe === result.pipeKey ? 'expanded' : ''}`}
                     style={{ borderLeftColor: PIPE_TREND_COLORS[result.trend] }}
                   >
                     <div
                       className="history-pipe-header"
                       onClick={() =>
                         setExpandedPipe(
-                          expandedPipe === result.pipeNumber ? null : result.pipeNumber
+                          expandedPipe === result.pipeKey ? null : result.pipeKey
                         )
                       }
                     >
