@@ -3710,6 +3710,85 @@ textarea {
   margin: 6px 0;
 }
 
+.field-completeness {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.completeness-bar {
+  width: 120px;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.completeness-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #f97316);
+  border-radius: 4px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.completeness-fill.complete {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.completeness-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.completeness-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-top: 0;
+  margin-bottom: 16px;
+  background: #fffbeb;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.completeness-hint.complete {
+  background: #ecfdf5;
+  border-color: #10b981;
+}
+
+.hint-icon {
+  font-size: 16px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.hint-text {
+  color: #92400e;
+  flex: 1;
+}
+
+.completeness-hint.complete .hint-text {
+  color: #065f46;
+}
+
+.hint-text strong {
+  color: #78350f;
+  font-weight: 600;
+}
+
+.completeness-hint.complete .hint-text strong {
+  color: #064e3b;
+}
+
 @media (max-width: 768px) {
   .history-filter-grid {
     grid-template-columns: 1fr;

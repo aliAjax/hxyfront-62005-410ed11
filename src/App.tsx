@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import "./styles.css";
 import { VenueManagement } from './components/VenueManagement';
 import { StopManagement } from './components/StopManagement';
@@ -187,6 +187,43 @@ function App() {
       [field]: value,
     }));
   };
+
+  const REQUIRED_FIELDS = [
+    '场馆名称',
+    '温度',
+    '湿度',
+    '音栓',
+    '音管编号',
+    '音高',
+    '音分偏差',
+    '维修备注',
+  ];
+
+  const fieldCompleteness = useMemo(() => {
+    const filledFields: string[] = [];
+    const missingFields: string[] = [];
+
+    REQUIRED_FIELDS.forEach((field) => {
+      const value = formValues[field];
+      if (value && value.trim() !== '') {
+        filledFields.push(field);
+      } else {
+        missingFields.push(field);
+      }
+    });
+
+    const completeness = filledFields.length;
+    const total = REQUIRED_FIELDS.length;
+    const percentage = Math.round((completeness / total) * 100);
+
+    return {
+      completeness,
+      total,
+      percentage,
+      filledFields,
+      missingFields,
+    };
+  }, [formValues]);
 
   const handleFilterClick = (filterName: string) => {
     const category = CATEGORY_FILTER_MAP[filterName];
@@ -633,8 +670,38 @@ function App() {
               <p>专业字段</p>
               <h2>新增记录</h2>
             </div>
-            <button className="primary">保存草稿</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="field-completeness">
+                <div className="completeness-bar">
+                  <div
+                    className={`completeness-fill ${fieldCompleteness.percentage === 100 ? 'complete' : ''}`}
+                    style={{ width: `${fieldCompleteness.percentage}%` }}
+                  />
+                </div>
+                <span className="completeness-text">
+                  {fieldCompleteness.completeness}/{fieldCompleteness.total} 字段
+                </span>
+              </div>
+              <button className="primary">保存草稿</button>
+            </div>
           </div>
+          {fieldCompleteness.missingFields.length > 0 && (
+            <div className="completeness-hint">
+              <span className="hint-icon">
+                {fieldCompleteness.percentage >= 50 ? '📝' : '⚠️'}
+              </span>
+              <span className="hint-text">
+                还缺少：
+                <strong>{fieldCompleteness.missingFields.join('、')}</strong>
+              </span>
+            </div>
+          )}
+          {fieldCompleteness.percentage === 100 && (
+            <div className="completeness-hint complete">
+              <span className="hint-icon">✅</span>
+              <span className="hint-text">所有必填字段已填写完成</span>
+            </div>
+          )}
           <div className="field-grid">
             <label className="full-width">
               <span>选择场馆</span>
