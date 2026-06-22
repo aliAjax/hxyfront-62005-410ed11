@@ -698,14 +698,7 @@ function App() {
         </div>
         {maintenanceTasks.length === 0 ? (
           <div className="empty-state">
-            <p>暂无维护记录，请先创建维护任务</p>
-            <button
-              className="primary"
-              onClick={() => setCurrentPage('create-task')}
-              style={{ marginTop: '12px' }}
-            >
-              📋 创建维护任务
-            </button>
+            <p>暂无维护记录</p>
           </div>
         ) : (
           <div className="records">
@@ -713,49 +706,17 @@ function App() {
               const abnormalCount = task.pipeRecords.filter(
                 (p) => maintenanceService.isPipeAbnormal(p)
               ).length;
-              const completedCount = task.pipeRecords.filter(
-                (p) => p.pitch || p.centDeviation !== undefined || p.remarks
-              ).length;
+              const details = [
+                task.maintenanceDate,
+                `异常音管 ${abnormalCount} 支`,
+                task.participants ? `参与人员：${task.participants}` : null,
+              ].filter(Boolean) as string[];
               return (
-                <article key={task.id} className="record-card" onClick={() => {
-                  setCurrentTaskId(task.id);
-                  setCurrentPage('tuning-record');
-                }}>
+                <article key={task.id}>
                   <b>{String(index + 1).padStart(2, '0')}</b>
-                  <div className="record-card-body">
-                    <div className="record-card-header">
-                      <h3>{task.venueName}</h3>
-                      <span className="record-date">{task.maintenanceDate}</span>
-                    </div>
-                    <div className="record-card-stats">
-                      <span className="record-stat">
-                        <span className="record-stat-label">音管</span>
-                        <span className="record-stat-value">{task.pipeRecords.length}</span>
-                      </span>
-                      <span className="record-stat">
-                        <span className="record-stat-label">已完成</span>
-                        <span className="record-stat-value" style={{ color: '#059669' }}>{completedCount}</span>
-                      </span>
-                      <span className="record-stat">
-                        <span className="record-stat-label">异常</span>
-                        <span className="record-stat-value" style={{ color: abnormalCount > 0 ? '#dc2626' : '#059669' }}>{abnormalCount}</span>
-                      </span>
-                      {task.participants && (
-                        <span className="record-stat">
-                          <span className="record-stat-label">人员</span>
-                          <span className="record-stat-value">{task.participants}</span>
-                        </span>
-                      )}
-                    </div>
-                    {(task.reportSummary || task.maintenanceNotes) && (
-                      <p className="record-card-summary">
-                        {task.reportSummary
-                          ? task.reportSummary.slice(0, 60) + (task.reportSummary.length > 60 ? '...' : '')
-                          : task.maintenanceNotes
-                            ? task.maintenanceNotes.slice(0, 60) + (task.maintenanceNotes.length > 60 ? '...' : '')
-                            : ''}
-                      </p>
-                    )}
+                  <div>
+                    <h3>{task.venueName}</h3>
+                    <p>{details.join(' · ')}</p>
                   </div>
                 </article>
               );

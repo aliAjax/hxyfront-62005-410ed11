@@ -157,13 +157,8 @@ export function MaintenanceReport({ taskId, onBack, restoreFromDraft }: Maintena
   } => {
     if (!task) return { results: [], summary: '' };
     const results = historyComparisonService.getComparisonForTask(taskId);
-    const currentTaskPipeKeys = new Set(
-      task.pipeRecords.map((p) => {
-        const stopKey = p.stopId || '__no_stop__';
-        return `${stopKey}::${p.pipeNumber}`;
-      })
-    );
-    const relevantResults = results.filter((r) => currentTaskPipeKeys.has(r.pipeKey));
+    const currentTaskPipeNumbers = new Set(task.pipeRecords.map((p) => p.pipeNumber));
+    const relevantResults = results.filter((r) => currentTaskPipeNumbers.has(r.pipeNumber));
     const problematicResults = relevantResults.filter(
       (r) => r.trend === 'persistently_high' || r.trend === 'persistently_low' || r.trend === 'sudden_exceed'
     );
@@ -654,7 +649,7 @@ export function MaintenanceReport({ taskId, onBack, restoreFromDraft }: Maintena
                 {historyComparison.results
                   .filter((r) => r.trend !== 'stable' && r.trend !== 'insufficient_data')
                   .map((result) => (
-                    <tr key={result.pipeKey} className={result.trend === 'sudden_exceed' ? 'abnormal-row' : ''}>
+                    <tr key={result.pipeNumber} className={result.trend === 'sudden_exceed' ? 'abnormal-row' : ''}>
                       <td><strong>{result.pipeNumber}</strong></td>
                       <td>
                         {result.stopId ? (

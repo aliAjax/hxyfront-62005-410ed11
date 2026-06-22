@@ -16,7 +16,6 @@ export interface PipeHistoryEntry {
 }
 
 export interface PipeComparisonResult {
-  pipeKey: string;
   pipeNumber: string;
   stopId?: string;
   stopName?: string;

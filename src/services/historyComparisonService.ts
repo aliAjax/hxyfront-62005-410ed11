@@ -9,11 +9,6 @@ import { maintenanceService } from './maintenanceService';
 const DEVIATION_THRESHOLD = 5;
 const PERSISTENT_MIN_OCCURRENCES = 2;
 const PERSISTENT_RATIO = 0.7;
-const NO_STOP_KEY = '__no_stop__';
-
-const buildPipeKey = (stopId: string | undefined, pipeNumber: string): string => {
-  return `${stopId || NO_STOP_KEY}::${pipeNumber}`;
-};
 
 export const historyComparisonService = {
   getPipeComparisonForVenue(venueId: string): PipeComparisonResult[] {
@@ -30,7 +25,7 @@ export const historyComparisonService = {
       for (const pipe of task.pipeRecords) {
         if (pipe.centDeviation === undefined) continue;
 
-        const key = buildPipeKey(pipe.stopId, pipe.pipeNumber);
+        const key = pipe.pipeNumber;
         if (!pipeMap.has(key)) {
           pipeMap.set(key, []);
         }
@@ -53,7 +48,7 @@ export const historyComparisonService = {
 
     const results: PipeComparisonResult[] = [];
 
-    for (const [pipeKey, history] of pipeMap) {
+    for (const [pipeNumber, history] of pipeMap) {
       const lastEntry = history[history.length - 1];
       const secondLastEntry = history.length >= 2 ? history[history.length - 2] : undefined;
 
@@ -78,8 +73,7 @@ export const historyComparisonService = {
       const trend = this.determineTrend(deviations, exceedCount);
 
       results.push({
-        pipeKey,
-        pipeNumber: lastEntry?.pipeRecord.pipeNumber || '',
+        pipeNumber,
         stopId: lastEntry?.pipeRecord.stopId,
         stopName: lastEntry?.pipeRecord.stopName,
         history,
@@ -104,18 +98,19 @@ export const historyComparisonService = {
       const ta = trendOrder[a.trend] ?? 99;
       const tb = trendOrder[b.trend] ?? 99;
       if (ta !== tb) return ta - tb;
-
-      const stopCompare = (a.stopName || '').localeCompare(b.stopName || '');
-      if (stopCompare !== 0) return stopCompare;
-
       return a.pipeNumber.localeCompare(b.pipeNumber, undefined, { numeric: true });
     });
   },
 
   determineTrend(deviations: number[], exceedCount: number): PipeTrendType {
-    if (deviations.length < 2) return 'insufficient_data';
+    if (deviations.length < 1) return 'insufficient_data';
 
     const latest = deviations[deviations.length - 1];
+
+    if (deviations.length < 2) {
+      return Math.abs(latest) > DEVIATION_THRESHOLD ? 'sudden_exceed' : 'insufficient_data';
+    }
+
     const isLatestExceed = Math.abs(latest) > DEVIATION_THRESHOLD;
     const previousDeviations = deviations.slice(0, -1);
     const previousAllWithinLimit = previousDeviations.every(
@@ -143,9 +138,13 @@ export const historyComparisonService = {
       return 'persistently_low';
     }
 
-    if (exceedCount > 0) {
+    if (exceedCount > 0 && isLatestExceed) {
       if (latest > DEVIATION_THRESHOLD) return 'persistently_high';
       if (latest < -DEVIATION_THRESHOLD) return 'persistently_low';
+    }
+
+    if (exceedCount === 0) {
+      return 'stable';
     }
 
     return 'stable';
@@ -183,21 +182,13 @@ export const historyComparisonService = {
       trendCounts[r.trend]++;
     }
 
-    const formatPipeLabel = (r: PipeComparisonResult): string => {
-      const stopPart = r.stopName ? `[${r.stopName}] ` : '';
-      const devPart = r.latestDeviation !== undefined
-        ? `(${r.latestDeviation > 0 ? '+' : ''}${r.latestDeviation}cent)`
-        : '';
-      return `${stopPart}${r.pipeNumber}${devPart}`;
-    };
-
     const lines: string[] = [];
     lines.push(`历史维护对比分析：共检查 ${results.length} 支音管。`);
 
     if (trendCounts.persistently_high > 0) {
       const pipes = results
         .filter((r) => r.trend === 'persistently_high')
-        .map(formatPipeLabel);
+        .map((r) => `${r.pipeNumber}(${r.latestDeviation !== undefined ? (r.latestDeviation > 0 ? '+' : '') + r.latestDeviation + 'cent' : 'N/A'})`);
       lines.push(
         `持续偏高 ${trendCounts.persistently_high} 支：${pipes.join('、')}，建议重点检查这些音管的物理状态及环境影响因素。`
       );
@@ -206,7 +197,7 @@ export const historyComparisonService = {
     if (trendCounts.persistently_low > 0) {
       const pipes = results
         .filter((r) => r.trend === 'persistently_low')
-        .map(formatPipeLabel);
+        .map((r) => `${r.pipeNumber}(${r.latestDeviation !== undefined ? (r.latestDeviation > 0 ? '+' : '') + r.latestDeviation + 'cent' : 'N/A'})`);
       lines.push(
         `持续偏低 ${trendCounts.persistently_low} 支：${pipes.join('、')}，需关注音管漏气或簧片老化问题。`
       );
@@ -215,7 +206,7 @@ export const historyComparisonService = {
     if (trendCounts.sudden_exceed > 0) {
       const pipes = results
         .filter((r) => r.trend === 'sudden_exceed')
-        .map(formatPipeLabel);
+        .map((r) => `${r.pipeNumber}(${r.latestDeviation !== undefined ? (r.latestDeviation > 0 ? '+' : '') + r.latestDeviation + 'cent' : 'N/A'})`);
       lines.push(
         `本次突然超限 ${trendCounts.sudden_exceed} 支：${pipes.join('、')}，需排查本次维护中的突发因素（温湿度变化、搬运损伤等）。`
       );
