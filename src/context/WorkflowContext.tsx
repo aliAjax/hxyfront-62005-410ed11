@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { MaintenanceTask, PipeRecord } from '../types/maintenance';
 import { maintenanceService } from '../services/maintenanceService';
@@ -12,6 +12,11 @@ import {
 } from '../types/workflow';
 
 const WORKFLOW_STORAGE_KEY = 'organ_tuning_workflow_state';
+
+function getStateSnapshot(s: WorkflowState): string {
+  const { lastSavedAt, ...rest } = s;
+  return JSON.stringify(rest);
+}
 
 const WorkflowContext = createContext<WorkflowContextValue | null>(null);
 
@@ -28,14 +33,16 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     return DEFAULT_WORKFLOW_STATE;
   });
 
+  const prevSnapshotRef = useRef<string>(getStateSnapshot(state));
+
   const saveWorkflowToStorage = useCallback(() => {
-    const toSave: WorkflowState = {
-      ...state,
-      lastSavedAt: new Date().toISOString(),
-    };
-    localStorage.setItem(WORKFLOW_STORAGE_KEY, JSON.stringify(toSave));
-    setState((prev) => ({ ...prev, lastSavedAt: toSave.lastSavedAt }));
-  }, [state]);
+    setState((prev) => {
+      const now = new Date().toISOString();
+      const toSave: WorkflowState = { ...prev, lastSavedAt: now };
+      localStorage.setItem(WORKFLOW_STORAGE_KEY, JSON.stringify(toSave));
+      return toSave;
+    });
+  }, []);
 
   const clearWorkflowStorage = useCallback(() => {
     localStorage.removeItem(WORKFLOW_STORAGE_KEY);
@@ -47,6 +54,7 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
       try {
         const parsed = JSON.parse(saved) as WorkflowState;
         setState(parsed);
+        prevSnapshotRef.current = getStateSnapshot(parsed);
         return true;
       } catch {
         return false;
@@ -58,14 +66,21 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
   const resetWorkflow = useCallback(() => {
     clearWorkflowStorage();
     setState(DEFAULT_WORKFLOW_STATE);
+    prevSnapshotRef.current = getStateSnapshot(DEFAULT_WORKFLOW_STATE);
   }, [clearWorkflowStorage]);
 
   useEffect(() => {
+    const currentSnapshot = getStateSnapshot(state);
+    if (currentSnapshot === prevSnapshotRef.current) return;
+    prevSnapshotRef.current = currentSnapshot;
     const timeout = window.setTimeout(() => {
-      saveWorkflowToStorage();
+      const now = new Date().toISOString();
+      const toSave: WorkflowState = { ...state, lastSavedAt: now };
+      localStorage.setItem(WORKFLOW_STORAGE_KEY, JSON.stringify(toSave));
+      setState((prev) => ({ ...prev, lastSavedAt: now }));
     }, 300);
     return () => window.clearTimeout(timeout);
-  }, [state, saveWorkflowToStorage]);
+  }, [state]);
 
   const markStepCompleted = useCallback((step: WorkflowStep) => {
     setState((prev) => {
