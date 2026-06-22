@@ -8,6 +8,7 @@ import { TuningDeviationEntry } from './components/TuningDeviationEntry';
 import { MaintenanceReport } from './components/MaintenanceReport';
 import { ReinspectionDashboard } from './components/ReinspectionDashboard';
 import { DraftList } from './components/DraftList';
+import { MaintenanceWorkflow } from './components/workflow/MaintenanceWorkflow';
 import { venueService } from './services/venueService';
 import { stopService } from './services/stopService';
 import { maintenanceService } from './services/maintenanceService';
@@ -17,7 +18,7 @@ import type { StopCategory } from './types/stops';
 import type { MaintenanceTask } from './types/maintenance';
 import { STOP_CATEGORY_LABELS, STOP_CATEGORY_COLORS } from './types/stops';
 
-type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation' | 'maintenance-report' | 'reinspection' | 'report-selector' | 'drafts';
+type Page = 'workspace' | 'venues' | 'stops' | 'create-task' | 'tuning-record' | 'tuning-deviation' | 'maintenance-report' | 'reinspection' | 'report-selector' | 'drafts' | 'workflow';
 
 const project = {
   "sourceNo": 7,
@@ -284,6 +285,14 @@ function App() {
     );
   }
 
+  if (currentPage === 'workflow') {
+    return (
+      <MaintenanceWorkflow
+        onBack={() => setCurrentPage('workspace')}
+      />
+    );
+  }
+
   if (currentPage === 'report-selector') {
     return (
       <main className="app">
@@ -459,8 +468,11 @@ function App() {
 
           <h2 style={{ marginTop: '24px' }}>快速入口</h2>
           <div className="quick-actions">
-            <button className="primary full-width" style={{ background: 'var(--accent)', borderColor: 'var(--accent)' }} onClick={() => setCurrentPage('create-task')}>
-              📋 创建维护任务
+            <button className="primary full-width" style={{ background: 'linear-gradient(135deg, #7c3aed, #0ea5e9)', borderColor: 'transparent', fontWeight: 700, boxShadow: '0 4px 14px rgba(124, 58, 237, 0.3)' }} onClick={() => setCurrentPage('workflow')}>
+              🔄 新建维护任务（引导式工作流）
+            </button>
+            <button className="primary full-width" style={{ marginTop: '10px', background: 'var(--accent)', borderColor: 'var(--accent)' }} onClick={() => setCurrentPage('create-task')}>
+              📋 创建维护任务（经典模式）
             </button>
             <button className="primary full-width" style={{ marginTop: '10px', background: 'var(--primary)', borderColor: 'var(--primary)' }} onClick={() => setCurrentPage('report-selector')}>
               📑 生成维护报告
